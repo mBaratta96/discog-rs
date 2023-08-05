@@ -1,15 +1,14 @@
-use reqwest::blocking::{multipart, Client};
-use reqwest::{header, redirect};
+use reqwest::blocking::{multipart, Client as ReqwestClient, RequestBuilder};
+use reqwest::header::{HeaderMap, HeaderValue, COOKIE};
+use reqwest::redirect;
 use serde::{Deserialize, Serialize};
 use serde_json;
 
-fn parse_document(doc: &str) -> scraper::Html {
-    scraper::Html::parse_document(doc)
-}
-
-fn create_selector(query: &str) -> scraper::Selector {
-    scraper::Selector::parse(query).unwrap()
-}
+const WEB_USER_AGENT: &str =
+    "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:109.0) Gecko/20100101 Firefox/116.0";
+const API_USER_AGENT: &str = "Discogs-stats/0.0.1";
+const WEB_HOME_URL: &str = "https://www.discogs.com";
+const API_HOME_URL: &str = "https://api.discogs.com";
 
 #[derive(Serialize, Deserialize)]
 struct Cookie {
@@ -17,7 +16,35 @@ struct Cookie {
     value: String,
 }
 
-pub fn create_cookie_header(path: &str) -> String {
+#[derive(Serialize, Deserialize)]
+struct Artist {
+    name: String,
+}
+
+#[derive(Serialize, Deserialize)]
+struct Release {
+    title: String,
+    artists: Vec<Artist>,
+}
+
+#[derive(Serialize, Deserialize)]
+struct Script {
+    authorization: String,
+}
+
+#[derive(Debug)]
+struct Client {
+    client: ReqwestClient,
+    home: String,
+}
+
+#[derive(Debug)]
+pub struct DiscogsScraper {
+    web: Client,
+    api: Client,
+}
+
+fn create_cookie_header(path: &str) -> String {
     let data = std::fs::read_to_string(path).expect("Unable to read file");
     let parsed_cookies: Vec<Cookie> =
         serde_json::from_str(&data).expect("Unable to parse Json file.");
@@ -28,38 +55,110 @@ pub fn create_cookie_header(path: &str) -> String {
         .join("; ")
 }
 
-#[derive(Debug)]
-pub struct DiscogsApi {
-    pub user_agent: String,
-    pub url: String,
-    pub cookies: String,
+fn send_request(req: RequestBuilder) -> String {
+    let res = req.send().expect("Failed random item.");
+    res.text().unwrap()
 }
-impl DiscogsApi {
-    pub fn get_random_release(&self) {
-        let url = format!("{}/mywantlist", &self.url);
-        println!("{}", url);
-        let form = multipart::Form::new().text("Action.RandomItem", "Random+Item");
-        let client = Client::builder()
-            .user_agent(
-                "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:109.0) Gecko/20100101 Firefox/116.0",
-            )
+
+fn create_selector(query: &str, el: &scraper::ElementRef) -> String {
+    let selector = scraper::Selector::parse(query).unwrap();
+    el.select(&selector)
+        .flat_map(|e| e.text().map(|t| t.trim()))
+        .collect::<Vec<&str>>()
+        .join(" ")
+}
+
+fn get_link(query: &str, el: &scraper::ElementRef) -> String {
+    let selector = scraper::Selector::parse(query).unwrap();
+    match el.select(&selector).next() {
+        Some(link) => link.value().attr("href").unwrap().to_string(),
+        None => String::from(""),
+    }
+}
+
+impl Client {
+    fn post(&self, url: &str) -> RequestBuilder {
+        let url = format!("{}/{}", &self.home, url);
+        self.client.post(url)
+    }
+
+    fn get(&self, url: &str) -> RequestBuilder {
+        self.client.get(format!("{}/{}", &self.home, url))
+    }
+}
+
+impl DiscogsScraper {
+    pub fn new(path: &str) -> DiscogsScraper {
+        let mut headers = HeaderMap::new();
+        headers.insert(
+            COOKIE,
+            HeaderValue::from_str(&create_cookie_header(path)).unwrap(),
+        );
+        let web_client = ReqwestClient::builder()
+            .user_agent(WEB_USER_AGENT)
             .redirect(redirect::Policy::none())
+            .default_headers(headers)
             .build()
             .unwrap();
-        let res = client
-            .post(url)
-            .multipart(form)
-            .header(header::COOKIE, &self.cookies)
-            .send()
-            .expect("Failed random item.");
-        let body = res.text().unwrap();
-        let document = parse_document(&body);
-        let links = document
-            .select(&create_selector("p a"))
+        let api_client = ReqwestClient::builder()
+            .user_agent(API_USER_AGENT)
+            .build()
+            .unwrap();
+        DiscogsScraper {
+            web: Client {
+                client: web_client,
+                home: String::from(WEB_HOME_URL),
+            },
+            api: Client {
+                client: api_client,
+                home: String::from(API_HOME_URL),
+            },
+        }
+    }
+    pub fn get_random_release(&self) -> Vec<String> {
+        let form = multipart::Form::new().text("Action.RandomItem", "Random+Item");
+        let res = self.web.post("mywantlist").multipart(form);
+        let document = scraper::Html::parse_document(&send_request(res));
+        let content = create_selector("p a", &document.root_element());
+        println!("{}", content);
+        let random_release_id = content
+            .split("/")
+            .last()
+            .unwrap()
+            .split("-")
             .next()
             .unwrap()
-            .text()
-            .collect::<Vec<_>>();
-        println!("{}", links.join(" "))
+            .to_string();
+        let release_res = self
+            .api
+            .get(format!("releases/{}", random_release_id).as_str());
+        let document = send_request(release_res);
+        let release: Release = serde_json::from_str(&document).expect("Unable to parse Json file.");
+        let artists = release
+            .artists
+            .iter()
+            .map(|a| a.name.to_string())
+            .collect::<Vec<String>>()
+            .join(" ");
+        println!("{} {}", release.title, artists);
+        let res = self
+            .web
+            .get(&format!("mywantlist?limit=250&search={}", release.title));
+        let search_page = scraper::Html::parse_document(&send_request(res));
+        let selector = scraper::Selector::parse("tr.shortcut_navigable").unwrap();
+        let releases = search_page.select(&selector);
+        let mut links: Vec<String> = Vec::new();
+        for (i, node) in releases.enumerate() {
+            let album_info = create_selector("span.release_title > *:not(:last-child)", &node);
+            let album_sellers = create_selector("span.marketplace_for_sale_count", &node);
+            let format = create_selector("td[data-header='Format']", &node);
+            let year = create_selector("td[data-header='Year']", &node);
+            links.push(get_link("span.marketplace_for_sale_count > a", &node));
+            println!(
+                "{}: {}-{}-{}-{}",
+                i, album_info, album_sellers, format, year
+            );
+        }
+        links
     }
 }
