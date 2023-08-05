@@ -1,3 +1,4 @@
+use crate::cli;
 use futures::{stream, StreamExt};
 use reqwest::blocking::{multipart, Client as ReqwestClient, RequestBuilder};
 use reqwest::header::{HeaderMap, HeaderValue, AUTHORIZATION, COOKIE, USER_AGENT};
@@ -167,17 +168,16 @@ impl DiscogsScraper {
         let selector = scraper::Selector::parse("tr.shortcut_navigable").unwrap();
         let releases = search_page.select(&selector);
         let mut links: Vec<String> = Vec::new();
-        for (i, node) in releases.enumerate() {
+        let mut table: Vec<Vec<String>> = Vec::new();
+        for node in releases {
             let album_info = node.get_inner_text("span.release_title > *:not(:last-child)");
             let album_sellers = node.get_inner_text("span.marketplace_for_sale_count");
             let format = node.get_inner_text("td[data-header='Format']");
             let year = node.get_inner_text("td[data-header='Year']");
             links.push(node.get_link("span.marketplace_for_sale_count > a"));
-            println!(
-                "{}: {}-{}-{}-{}",
-                i, album_info, album_sellers, format, year
-            );
+            table.push(vec![album_info, format, year, album_sellers]);
         }
+        cli::print_table(vec!["Title", "Format", "Year", "Sellers"], table);
         links
     }
 
@@ -223,6 +223,7 @@ impl DiscogsScraper {
         );
         let selector = scraper::Selector::parse("tr.shortcut_navigable").unwrap();
         let mut sellers: Vec<String> = Vec::new();
+        let mut table: Vec<Vec<String>> = Vec::new();
         for (i, node) in sellers_page.select(&selector).enumerate() {
             let shipping_from = &node.get_inner_text("td.seller_info ul li:nth-child(3)")[12..];
             let price = node.get_inner_text("td.item_price span.price");
@@ -237,11 +238,18 @@ impl DiscogsScraper {
                 .join("");
             let amount = amounts.get(i).unwrap();
             sellers.push(amount.seller.clone());
-            println!(
-                "{}:{}-{}-{}-{}-{}",
-                i, shipping_from, price, condition, amount.amount, amount.seller
-            );
+            table.push(vec![
+                condition,
+                amount.seller.clone(),
+                amount.amount.clone(),
+                shipping_from.to_string(),
+                price,
+            ]);
         }
+        cli::print_table(
+            vec!["Condition", "Seller", "Amount", "Shipping From", "Price"],
+            table,
+        );
         sellers
     }
 
@@ -250,13 +258,19 @@ impl DiscogsScraper {
         let res = self.web.get(&url);
         let items_page = scraper::Html::parse_document(&res.send_request());
         let selector = scraper::Selector::parse("tr.shortcut_navigable").unwrap();
-        for (i, node) in items_page.select(&selector).enumerate() {
+        let mut table: Vec<Vec<String>> = Vec::new();
+        for node in items_page.select(&selector) {
             let release = node.get_inner_text("a.item_description_title");
             let link = node.get_link("a.item_description_title");
             let condition =
                 node.get_inner_text("p.item_condition > *:not(.condition-label-desktop)");
             let price = node.get_inner_text("td.item_price span.price");
-            println!("{}:{}-{}-{}-{}", i, release, link, condition, price);
+            table.push(vec![
+                format!("{}\n{}{}", release, WEB_HOME_URL, link),
+                condition,
+                price,
+            ]);
         }
+        cli::print_table(vec!["Realease", "Condition", "Price"], table);
     }
 }

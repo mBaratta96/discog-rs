@@ -1,3 +1,4 @@
+mod cli;
 mod web;
 
 fn main() {
