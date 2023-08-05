@@ -35,7 +35,8 @@ struct Script {
 }
 #[derive(Serialize, Deserialize)]
 struct Amount {
-    amount: i32,
+    amount: String,
+    seller: String,
 }
 
 #[derive(Debug)]
@@ -180,7 +181,7 @@ impl DiscogsScraper {
         links
     }
 
-    pub fn get_sellers(&self, sellers_link: &str) {
+    pub fn get_sellers(&self, sellers_link: &str) -> Vec<String> {
         let res = self.web.get(sellers_link);
         let sellers_page = scraper::Html::parse_document(&res.send_request());
         let script = &sellers_page
@@ -196,47 +197,66 @@ impl DiscogsScraper {
         let amount_urls = &sellers_page
             .root_element()
             .get_inner_text("td.seller_info div.seller_block a");
-        let amounts: Vec<i32> = rt.block_on(
+        let asynch_client = reqwest::Client::new();
+        let amounts: Vec<Amount> = rt.block_on(
             stream::iter(amount_urls.split(" "))
                 .map(|seller| {
                     let url = format!("{}/marketplace/mywants/{}/amount", API_HOME_URL, seller);
-                    let client = reqwest::Client::new();
+                    let client = &asynch_client;
                     let req = client
                         .get(&url)
                         .header(AUTHORIZATION, &token)
                         .header(USER_AGENT, API_USER_AGENT);
-                    async {
+                    async move {
                         let res = req.send().await.unwrap();
                         let body = res.text().await.unwrap();
-                        let amount: Amount =
+                        let amount: serde_json::Value =
                             serde_json::from_str(&body).expect("Error parsing json");
-                        amount.amount
+                        Amount {
+                            amount: amount["amount"].to_string(),
+                            seller: String::from(seller),
+                        }
                     }
                 })
                 .buffer_unordered(CONCURRENT_REQUESTS)
                 .collect(),
         );
         let selector = scraper::Selector::parse("tr.shortcut_navigable").unwrap();
+        let mut sellers: Vec<String> = Vec::new();
         for (i, node) in sellers_page.select(&selector).enumerate() {
-            let shipping_from = &node.get_inner_text("td.seller_info ul li:nth-child(3)")[11..];
+            let shipping_from = &node.get_inner_text("td.seller_info ul li:nth-child(3)")[12..];
             let price = node.get_inner_text("td.item_price span.price");
             let condition =
                 node.get_inner_text("p.item_condition > *:not(.condition-label-desktop)");
+            // remove condition description which is always found in between media and sleeve nodes
             let condition = condition
                 .split("   ")
                 .enumerate()
-                .filter(|&(i, _)| i != 1)
-                .map(|(_, v)| v)
+                .filter_map(|(i, c)| if i != 1 { Some(c) } else { None })
                 .collect::<Vec<&str>>()
                 .join("");
+            let amount = amounts.get(i).unwrap();
+            sellers.push(amount.seller.clone());
             println!(
-                "{}: {}-{}-{}-{}",
-                i,
-                shipping_from,
-                price,
-                condition,
-                amounts.get(i).unwrap()
+                "{}:{}-{}-{}-{}-{}",
+                i, shipping_from, price, condition, amount.amount, amount.seller
             );
+        }
+        sellers
+    }
+
+    pub fn get_seller_items(&self, seller: &str) {
+        let url = format!("/seller/{}/mywants?limit=250&sort=price%2Casc", seller);
+        let res = self.web.get(&url);
+        let items_page = scraper::Html::parse_document(&res.send_request());
+        let selector = scraper::Selector::parse("tr.shortcut_navigable").unwrap();
+        for (i, node) in items_page.select(&selector).enumerate() {
+            let release = node.get_inner_text("a.item_description_title");
+            let link = node.get_link("a.item_description_title");
+            let condition =
+                node.get_inner_text("p.item_condition > *:not(.condition-label-desktop)");
+            let price = node.get_inner_text("td.item_price span.price");
+            println!("{}:{}-{}-{}-{}", i, release, link, condition, price);
         }
     }
 }
