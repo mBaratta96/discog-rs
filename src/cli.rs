@@ -1,3 +1,4 @@
+use inquire::{validator::Validation, CustomType};
 use tabled::builder::Builder;
 use tabled::settings::{peaker::PriorityMax, style::BorderColor, Color, Style, Width};
 use terminal_size::{terminal_size, Width as TermWidth};
@@ -23,4 +24,17 @@ pub fn print_table(header: Vec<&str>, table: Vec<Vec<String>>) {
         .with(Width::wrap(term_width as usize).priority::<PriorityMax>());
 
     println!("{}", table);
+}
+
+pub fn ask_id(len: i32) -> i32 {
+    let selection = CustomType::<i32>::new("Select the index:")
+        .with_validator(move |input: &i32| {
+            if (-1..=len).contains(input) {
+                Ok(Validation::Valid)
+            } else {
+                Ok(Validation::Invalid("Input outside of index range.".into()))
+            }
+        })
+        .prompt();
+    selection.unwrap()
 }

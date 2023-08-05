@@ -135,7 +135,7 @@ impl DiscogsScraper {
             },
         }
     }
-    pub fn get_random_release(&self) -> Vec<String> {
+    pub fn get_random_release(&self) -> (Vec<String>, Vec<Vec<String>>) {
         let form = multipart::Form::new().text("Action.RandomItem", "Random+Item");
         let res = self.web.post("mywantlist").multipart(form);
         let document = scraper::Html::parse_document(&res.send_request());
@@ -177,11 +177,10 @@ impl DiscogsScraper {
             links.push(node.get_link("span.marketplace_for_sale_count > a"));
             table.push(vec![album_info, format, year, album_sellers]);
         }
-        cli::print_table(vec!["Title", "Format", "Year", "Sellers"], table);
-        links
+        (links, table)
     }
 
-    pub fn get_sellers(&self, sellers_link: &str) -> Vec<String> {
+    pub fn get_sellers(&self, sellers_link: &str) -> (Vec<String>, Vec<Vec<String>>) {
         let res = self.web.get(sellers_link);
         let sellers_page = scraper::Html::parse_document(&res.send_request());
         let script = &sellers_page
@@ -246,11 +245,8 @@ impl DiscogsScraper {
                 price,
             ]);
         }
-        cli::print_table(
-            vec!["Condition", "Seller", "Amount", "Shipping From", "Price"],
-            table,
-        );
-        sellers
+
+        (sellers, table)
     }
 
     pub fn get_seller_items(&self, seller: &str) {
