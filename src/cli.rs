@@ -16,11 +16,15 @@ pub fn print_table(header: Vec<&str>, table: Vec<Vec<String>>) {
     let (TermWidth(term_width), _) = terminal_size().expect("Failed to get terminal size.");
 
     table
-        .with(Style::ascii_rounded())
+        .with(Style::rounded().horizontal('-'))
         .with(BorderColor::default().top(Color::FG_BLUE))
         .with(BorderColor::default().bottom(Color::FG_BLUE))
         .with(BorderColor::default().left(Color::FG_BLUE))
         .with(BorderColor::default().right(Color::FG_BLUE))
+        .with(BorderColor::default().corner_bottom_left(Color::FG_BLUE))
+        .with(BorderColor::default().corner_bottom_right(Color::FG_BLUE))
+        .with(BorderColor::default().corner_top_left(Color::FG_BLUE))
+        .with(BorderColor::default().corner_top_right(Color::FG_BLUE))
         .with(Width::wrap(term_width as usize).priority::<PriorityMax>());
 
     println!("{}", table);

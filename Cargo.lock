@@ -236,7 +236,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "discogs_rs"
+name = "discogs"
 version = "0.1.0"
 dependencies = [
  "futures",

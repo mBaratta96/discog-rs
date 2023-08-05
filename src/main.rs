@@ -2,7 +2,8 @@ mod cli;
 mod web;
 
 fn main() {
-    let scraper = web::DiscogsScraper::new("./.cookies.json");
+    let cookies_path = std::env::args().nth(1).expect("no cookies file path given");
+    let scraper = web::DiscogsScraper::new(&cookies_path);
     let (links, table) = scraper.get_random_release();
     loop {
         cli::print_table(vec!["Title", "Format", "Year", "Sellers"], table.clone());
