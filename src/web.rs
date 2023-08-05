@@ -226,12 +226,13 @@ impl DiscogsScraper {
                 .enumerate()
                 .filter_map(|(i, c)| if i != 1 { Some(c) } else { None })
                 .join("");
-            let amount = amounts.get(i).unwrap();
-            sellers.push(amount.seller.clone());
+            let seller = &amounts[i].seller;
+            let amount = &amounts[i].amount;
+            sellers.push(seller.to_string());
             table.push(vec![
                 condition,
-                amount.seller.clone(),
-                amount.amount.clone(),
+                seller.to_string(),
+                amount.to_string(),
                 shipping_from.to_string(),
                 price,
             ]);

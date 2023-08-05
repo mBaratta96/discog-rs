@@ -18,7 +18,7 @@ fn main() {
         if selected_index == len {
             break;
         }
-        if links.get(selected_index as usize).unwrap().len() == 0 {
+        if links[selected_index as usize].len() == 0 {
             println!("No sellers for the selected item. Retry:");
             print_table = false;
             continue;
@@ -40,7 +40,7 @@ fn main() {
                 break;
             }
 
-            let selected = sellers.get(selected_index as usize).unwrap();
+            let selected = &sellers[selected_index as usize];
             let (links, table) = scraper.get_seller_items(selected);
             cli::print_table(vec!["Realease", "Condition", "Price"], table.clone());
             loop {
@@ -52,7 +52,7 @@ fn main() {
                 if selected_index == len {
                     break;
                 }
-                scraper.add_to_cart(links.get(selected_index as usize).unwrap());
+                scraper.add_to_cart(&links[selected_index as usize]);
             }
         }
     }
