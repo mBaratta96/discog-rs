@@ -1,4 +1,5 @@
 use futures::{stream, StreamExt};
+use itertools::Itertools;
 use reqwest::blocking::{multipart, Client as ReqwestClient, RequestBuilder};
 use reqwest::header::{HeaderMap, HeaderValue, AUTHORIZATION, COOKIE, USER_AGENT};
 use reqwest::redirect;
@@ -58,7 +59,6 @@ fn create_cookie_header(path: &str) -> String {
     parsed_cookies
         .iter()
         .map(|cookie| format!("{}={}", cookie.name, cookie.value))
-        .collect::<Vec<String>>()
         .join("; ")
 }
 
@@ -83,7 +83,6 @@ impl ExtendedNode for scraper::ElementRef<'_> {
         let selector = scraper::Selector::parse(query).unwrap();
         self.select(&selector)
             .flat_map(|e| e.text().map(|t| t.trim()))
-            .collect::<Vec<&str>>()
             .join(" ")
     }
     fn get_link(&self, query: &str) -> String {
@@ -152,12 +151,7 @@ impl DiscogsScraper {
             .get(format!("releases/{}", random_release_id).as_str());
         let document = release_res.send_request();
         let release: Release = serde_json::from_str(&document).expect("Unable to parse Json file.");
-        let artists = release
-            .artists
-            .iter()
-            .map(|a| a.name.to_string())
-            .collect::<Vec<String>>()
-            .join(" ");
+        let artists = release.artists.iter().map(|a| a.name.to_string()).join(" ");
         println!("Found {} - {}", release.title, artists);
         let res = self
             .web
@@ -231,7 +225,6 @@ impl DiscogsScraper {
                 .split("   ")
                 .enumerate()
                 .filter_map(|(i, c)| if i != 1 { Some(c) } else { None })
-                .collect::<Vec<&str>>()
                 .join("");
             let amount = amounts.get(i).unwrap();
             sellers.push(amount.seller.clone());
