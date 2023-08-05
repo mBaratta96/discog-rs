@@ -8,7 +8,7 @@ fn main() {
     let mut print_table = true;
     loop {
         if print_table {
-            cli::print_table(vec!["Title", "Format", "Year", "Sellers"], table.clone());
+            cli::print_table(vec!["Title", "Format", "Year", "Sellers"], &table);
         }
         let len = links.len() as i32;
         let selected_index = cli::ask_id(len, "Select an ID:");
@@ -29,7 +29,7 @@ fn main() {
         loop {
             cli::print_table(
                 vec!["Condition", "Seller", "Amount", "Shipping From", "Price"],
-                table.clone(),
+                &table,
             );
             let len = sellers.len() as i32;
             let selected_index = cli::ask_id(len, "Select an ID:");
@@ -42,7 +42,7 @@ fn main() {
 
             let selected = &sellers[selected_index as usize];
             let (links, table) = scraper.get_seller_items(selected);
-            cli::print_table(vec!["Realease", "Condition", "Price"], table.clone());
+            cli::print_table(vec!["Realease", "Condition", "Price"], &table);
             loop {
                 let len = links.len() as i32;
                 let selected_index = cli::ask_id(len, "Want to add something to the cart?");

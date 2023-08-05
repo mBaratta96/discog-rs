@@ -3,7 +3,7 @@ use tabled::builder::Builder;
 use tabled::settings::{peaker::PriorityMax, style::BorderColor, Color, Style, Width};
 use terminal_size::{terminal_size, Width as TermWidth};
 
-pub fn print_table(header: Vec<&str>, table: Vec<Vec<String>>) {
+pub fn print_table(header: Vec<&str>, table: &Vec<Vec<String>>) {
     let mut builder = Builder::default();
 
     builder.set_header(header);
