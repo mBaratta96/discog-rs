@@ -1,4 +1,4 @@
-use futures::future;
+use futures::{stream, StreamExt};
 use reqwest::blocking::{multipart, Client as ReqwestClient, RequestBuilder};
 use reqwest::header::{HeaderMap, HeaderValue, AUTHORIZATION, COOKIE, USER_AGENT};
 use reqwest::redirect;
@@ -10,6 +10,7 @@ const WEB_USER_AGENT: &str =
 const API_USER_AGENT: &str = "Discogs-stats/0.0.1";
 const WEB_HOME_URL: &str = "https://www.discogs.com";
 const API_HOME_URL: &str = "https://api.discogs.com";
+const CONCURRENT_REQUESTS: usize = 20;
 
 #[derive(Serialize, Deserialize)]
 struct Cookie {
@@ -174,7 +175,6 @@ impl DiscogsScraper {
             .replace("\n", "")[41..1702];
         let script: Script = serde_json::from_str(script).expect("Unable to parse Json file.");
         let token = script.authorization;
-        println!("{}", token);
         let rt = tokio::runtime::Builder::new_multi_thread()
             .enable_all()
             .build()
@@ -183,24 +183,47 @@ impl DiscogsScraper {
             "td.seller_info div.seller_block a",
             &sellers_page.root_element(),
         );
-        println!("{}", amount_urls);
-        let amounts = rt.block_on(future::join_all(amount_urls.split(" ").map(|seller| {
-            let url = format!(
-                "https://api.discogs.com/marketplace/mywants/{}/amount",
-                seller
+        let amounts: Vec<i32> = rt.block_on(
+            stream::iter(amount_urls.split(" "))
+                .map(|seller| {
+                    let url = format!("{}/marketplace/mywants/{}/amount", API_HOME_URL, seller);
+                    let client = reqwest::Client::new();
+                    let req = client
+                        .get(&url)
+                        .header(AUTHORIZATION, &token)
+                        .header(USER_AGENT, API_USER_AGENT);
+                    async {
+                        let res = req.send().await.unwrap();
+                        let body = res.text().await.unwrap();
+                        let amount: Amount =
+                            serde_json::from_str(&body).expect("Error parsing json");
+                        amount.amount
+                    }
+                })
+                .buffer_unordered(CONCURRENT_REQUESTS)
+                .collect(),
+        );
+        let selector = scraper::Selector::parse("tr.shortcut_navigable").unwrap();
+        for (i, node) in sellers_page.select(&selector).enumerate() {
+            let shipping_from = &create_selector("td.seller_info ul li:nth-child(3)", &node)[11..];
+            let price = create_selector("td.item_price span.price", &node);
+            let condition =
+                create_selector("p.item_condition > *:not(.condition-label-desktop)", &node);
+            let condition = condition
+                .split("   ")
+                .enumerate()
+                .filter(|&(i, _)| i != 1)
+                .map(|(_, v)| v)
+                .collect::<Vec<&str>>()
+                .join("");
+            println!(
+                "{}: {}-{}-{}-{}",
+                i,
+                shipping_from,
+                price,
+                condition,
+                amounts.get(i).unwrap()
             );
-            let client = reqwest::Client::new();
-            let req = client
-                .get(&url)
-                .header(AUTHORIZATION, &token)
-                .header(USER_AGENT, API_USER_AGENT);
-            async {
-                let res = req.send().await.unwrap();
-                let body = res.text().await.unwrap();
-                let amount: Amount = serde_json::from_str(&body).expect("Error parsing json");
-                amount.amount
-            }
-        })));
-        println!("{:#?}", amounts);
+        }
     }
 }
