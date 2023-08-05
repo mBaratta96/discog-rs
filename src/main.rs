@@ -5,8 +5,11 @@ fn main() {
     let cookies_path = std::env::args().nth(1).expect("no cookies file path given");
     let scraper = web::DiscogsScraper::new(&cookies_path);
     let (links, table) = scraper.get_random_release();
+    let mut print_table = true;
     loop {
-        cli::print_table(vec!["Title", "Format", "Year", "Sellers"], table.clone());
+        if print_table {
+            cli::print_table(vec!["Title", "Format", "Year", "Sellers"], table.clone());
+        }
         let len = links.len() as i32;
         let selected_index = cli::ask_id(len, "Select an ID:");
         if selected_index == -1 {
@@ -15,6 +18,12 @@ fn main() {
         if selected_index == len {
             break;
         }
+        if links.get(selected_index as usize).unwrap().len() == 0 {
+            println!("No sellers for the selected item. Retry:");
+            print_table = false;
+            continue;
+        }
+        print_table = true;
         let selected = links.get(selected_index as usize).unwrap();
         let (sellers, table) = scraper.get_sellers(selected);
         loop {
