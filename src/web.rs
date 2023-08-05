@@ -1,5 +1,6 @@
+use futures::future;
 use reqwest::blocking::{multipart, Client as ReqwestClient, RequestBuilder};
-use reqwest::header::{HeaderMap, HeaderValue, COOKIE};
+use reqwest::header::{HeaderMap, HeaderValue, AUTHORIZATION, COOKIE, USER_AGENT};
 use reqwest::redirect;
 use serde::{Deserialize, Serialize};
 use serde_json;
@@ -30,6 +31,10 @@ struct Release {
 #[derive(Serialize, Deserialize)]
 struct Script {
     authorization: String,
+}
+#[derive(Serialize, Deserialize)]
+struct Amount {
+    amount: i32,
 }
 
 #[derive(Debug)]
@@ -170,5 +175,32 @@ impl DiscogsScraper {
         let script: Script = serde_json::from_str(script).expect("Unable to parse Json file.");
         let token = script.authorization;
         println!("{}", token);
+        let rt = tokio::runtime::Builder::new_multi_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+        let amount_urls = create_selector(
+            "td.seller_info div.seller_block a",
+            &sellers_page.root_element(),
+        );
+        println!("{}", amount_urls);
+        let amounts = rt.block_on(future::join_all(amount_urls.split(" ").map(|seller| {
+            let url = format!(
+                "https://api.discogs.com/marketplace/mywants/{}/amount",
+                seller
+            );
+            let client = reqwest::Client::new();
+            let req = client
+                .get(&url)
+                .header(AUTHORIZATION, &token)
+                .header(USER_AGENT, API_USER_AGENT);
+            async {
+                let res = req.send().await.unwrap();
+                let body = res.text().await.unwrap();
+                let amount: Amount = serde_json::from_str(&body).expect("Error parsing json");
+                amount.amount
+            }
+        })));
+        println!("{:#?}", amounts);
     }
 }
