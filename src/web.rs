@@ -61,24 +61,36 @@ fn create_cookie_header(path: &str) -> String {
         .join("; ")
 }
 
-fn send_request(req: RequestBuilder) -> String {
-    let res = req.send().expect("Failed random item.");
-    res.text().unwrap()
+trait Send {
+    fn send_request(self) -> String;
 }
 
-fn create_selector(query: &str, el: &scraper::ElementRef) -> String {
-    let selector = scraper::Selector::parse(query).unwrap();
-    el.select(&selector)
-        .flat_map(|e| e.text().map(|t| t.trim()))
-        .collect::<Vec<&str>>()
-        .join(" ")
+impl Send for RequestBuilder {
+    fn send_request(self) -> String {
+        let res = self.send().expect("Failed random item.");
+        res.text().unwrap()
+    }
 }
 
-fn get_link(query: &str, el: &scraper::ElementRef) -> String {
-    let selector = scraper::Selector::parse(query).unwrap();
-    match el.select(&selector).next() {
-        Some(link) => link.value().attr("href").unwrap().to_string(),
-        None => String::from(""),
+trait ExtendedNode {
+    fn get_inner_text(&self, query: &str) -> String;
+    fn get_link(&self, query: &str) -> String;
+}
+
+impl ExtendedNode for scraper::ElementRef<'_> {
+    fn get_inner_text(&self, query: &str) -> String {
+        let selector = scraper::Selector::parse(query).unwrap();
+        self.select(&selector)
+            .flat_map(|e| e.text().map(|t| t.trim()))
+            .collect::<Vec<&str>>()
+            .join(" ")
+    }
+    fn get_link(&self, query: &str) -> String {
+        let selector = scraper::Selector::parse(query).unwrap();
+        match self.select(&selector).next() {
+            Some(link) => link.value().attr("href").unwrap().to_string(),
+            None => String::from(""),
+        }
     }
 }
 
@@ -124,8 +136,8 @@ impl DiscogsScraper {
     pub fn get_random_release(&self) -> Vec<String> {
         let form = multipart::Form::new().text("Action.RandomItem", "Random+Item");
         let res = self.web.post("mywantlist").multipart(form);
-        let document = scraper::Html::parse_document(&send_request(res));
-        let content = create_selector("p a", &document.root_element());
+        let document = scraper::Html::parse_document(&res.send_request());
+        let content = &document.root_element().get_inner_text("p a");
         println!("{}", content);
         let random_release_id = content
             .split("/")
@@ -138,7 +150,7 @@ impl DiscogsScraper {
         let release_res = self
             .api
             .get(format!("releases/{}", random_release_id).as_str());
-        let document = send_request(release_res);
+        let document = release_res.send_request();
         let release: Release = serde_json::from_str(&document).expect("Unable to parse Json file.");
         let artists = release
             .artists
@@ -150,16 +162,16 @@ impl DiscogsScraper {
         let res = self
             .web
             .get(&format!("mywantlist?limit=250&search={}", release.title));
-        let search_page = scraper::Html::parse_document(&send_request(res));
+        let search_page = scraper::Html::parse_document(&res.send_request());
         let selector = scraper::Selector::parse("tr.shortcut_navigable").unwrap();
         let releases = search_page.select(&selector);
         let mut links: Vec<String> = Vec::new();
         for (i, node) in releases.enumerate() {
-            let album_info = create_selector("span.release_title > *:not(:last-child)", &node);
-            let album_sellers = create_selector("span.marketplace_for_sale_count", &node);
-            let format = create_selector("td[data-header='Format']", &node);
-            let year = create_selector("td[data-header='Year']", &node);
-            links.push(get_link("span.marketplace_for_sale_count > a", &node));
+            let album_info = node.get_inner_text("span.release_title > *:not(:last-child)");
+            let album_sellers = node.get_inner_text("span.marketplace_for_sale_count");
+            let format = node.get_inner_text("td[data-header='Format']");
+            let year = node.get_inner_text("td[data-header='Year']");
+            links.push(node.get_link("span.marketplace_for_sale_count > a"));
             println!(
                 "{}: {}-{}-{}-{}",
                 i, album_info, album_sellers, format, year
@@ -170,8 +182,10 @@ impl DiscogsScraper {
 
     pub fn get_sellers(&self, sellers_link: &str) {
         let res = self.web.get(sellers_link);
-        let sellers_page = scraper::Html::parse_document(&send_request(res));
-        let script = &create_selector("script#dsdata", &sellers_page.root_element())
+        let sellers_page = scraper::Html::parse_document(&res.send_request());
+        let script = &sellers_page
+            .root_element()
+            .get_inner_text("script#dsdata")
             .replace("\n", "")[41..1702];
         let script: Script = serde_json::from_str(script).expect("Unable to parse Json file.");
         let token = script.authorization;
@@ -179,10 +193,9 @@ impl DiscogsScraper {
             .enable_all()
             .build()
             .unwrap();
-        let amount_urls = create_selector(
-            "td.seller_info div.seller_block a",
-            &sellers_page.root_element(),
-        );
+        let amount_urls = &sellers_page
+            .root_element()
+            .get_inner_text("td.seller_info div.seller_block a");
         let amounts: Vec<i32> = rt.block_on(
             stream::iter(amount_urls.split(" "))
                 .map(|seller| {
@@ -205,10 +218,10 @@ impl DiscogsScraper {
         );
         let selector = scraper::Selector::parse("tr.shortcut_navigable").unwrap();
         for (i, node) in sellers_page.select(&selector).enumerate() {
-            let shipping_from = &create_selector("td.seller_info ul li:nth-child(3)", &node)[11..];
-            let price = create_selector("td.item_price span.price", &node);
+            let shipping_from = &node.get_inner_text("td.seller_info ul li:nth-child(3)")[11..];
+            let price = node.get_inner_text("td.item_price span.price");
             let condition =
-                create_selector("p.item_condition > *:not(.condition-label-desktop)", &node);
+                node.get_inner_text("p.item_condition > *:not(.condition-label-desktop)");
             let condition = condition
                 .split("   ")
                 .enumerate()
