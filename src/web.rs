@@ -161,4 +161,14 @@ impl DiscogsScraper {
         }
         links
     }
+
+    pub fn get_sellers(&self, sellers_link: &str) {
+        let res = self.web.get(sellers_link);
+        let sellers_page = scraper::Html::parse_document(&send_request(res));
+        let script = &create_selector("script#dsdata", &sellers_page.root_element())
+            .replace("\n", "")[41..1702];
+        let script: Script = serde_json::from_str(script).expect("Unable to parse Json file.");
+        let token = script.authorization;
+        println!("{}", token);
+    }
 }
