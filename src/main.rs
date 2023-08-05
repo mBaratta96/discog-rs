@@ -7,7 +7,7 @@ fn main() {
     loop {
         cli::print_table(vec!["Title", "Format", "Year", "Sellers"], table.clone());
         let len = links.len() as i32;
-        let selected_index = cli::ask_id(len);
+        let selected_index = cli::ask_id(len, "Select an ID:");
         if selected_index == -1 {
             std::process::exit(0);
         }
@@ -22,7 +22,7 @@ fn main() {
                 table.clone(),
             );
             let len = sellers.len() as i32;
-            let selected_index = cli::ask_id(len);
+            let selected_index = cli::ask_id(len, "Select an ID:");
             if selected_index == -1 {
                 std::process::exit(0);
             }
@@ -31,8 +31,19 @@ fn main() {
             }
 
             let selected = sellers.get(selected_index as usize).unwrap();
-            scraper.get_seller_items(selected);
-            break;
+            let (links, table) = scraper.get_seller_items(selected);
+            cli::print_table(vec!["Realease", "Condition", "Price"], table.clone());
+            loop {
+                let len = links.len() as i32;
+                let selected_index = cli::ask_id(len, "Want to add something to the cart?");
+                if selected_index == -1 {
+                    std::process::exit(0);
+                }
+                if selected_index == len {
+                    break;
+                }
+                scraper.add_to_cart(links.get(selected_index as usize).unwrap());
+            }
         }
     }
 }

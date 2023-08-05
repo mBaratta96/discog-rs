@@ -26,8 +26,8 @@ pub fn print_table(header: Vec<&str>, table: Vec<Vec<String>>) {
     println!("{}", table);
 }
 
-pub fn ask_id(len: i32) -> i32 {
-    let selection = CustomType::<i32>::new("Select the index:")
+pub fn ask_id(len: i32, request: &str) -> i32 {
+    let selection = CustomType::<i32>::new(request)
         .with_validator(move |input: &i32| {
             if (-1..=len).contains(input) {
                 Ok(Validation::Valid)

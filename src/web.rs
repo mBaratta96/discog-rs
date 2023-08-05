@@ -1,4 +1,3 @@
-use crate::cli;
 use futures::{stream, StreamExt};
 use reqwest::blocking::{multipart, Client as ReqwestClient, RequestBuilder};
 use reqwest::header::{HeaderMap, HeaderValue, AUTHORIZATION, COOKIE, USER_AGENT};
@@ -140,7 +139,6 @@ impl DiscogsScraper {
         let res = self.web.post("mywantlist").multipart(form);
         let document = scraper::Html::parse_document(&res.send_request());
         let content = &document.root_element().get_inner_text("p a");
-        println!("{}", content);
         let random_release_id = content
             .split("/")
             .last()
@@ -160,7 +158,7 @@ impl DiscogsScraper {
             .map(|a| a.name.to_string())
             .collect::<Vec<String>>()
             .join(" ");
-        println!("{} {}", release.title, artists);
+        println!("Found {} - {}", release.title, artists);
         let res = self
             .web
             .get(&format!("mywantlist?limit=250&search={}", release.title));
@@ -249,24 +247,30 @@ impl DiscogsScraper {
         (sellers, table)
     }
 
-    pub fn get_seller_items(&self, seller: &str) {
+    pub fn get_seller_items(&self, seller: &str) -> (Vec<String>, Vec<Vec<String>>) {
         let url = format!("/seller/{}/mywants?limit=250&sort=price%2Casc", seller);
         let res = self.web.get(&url);
         let items_page = scraper::Html::parse_document(&res.send_request());
         let selector = scraper::Selector::parse("tr.shortcut_navigable").unwrap();
         let mut table: Vec<Vec<String>> = Vec::new();
+        let mut links: Vec<String> = Vec::new();
         for node in items_page.select(&selector) {
             let release = node.get_inner_text("a.item_description_title");
             let link = node.get_link("a.item_description_title");
             let condition =
                 node.get_inner_text("p.item_condition > *:not(.condition-label-desktop)");
             let price = node.get_inner_text("td.item_price span.price");
+            links.push(node.get_link("td.item_add_to_cart > a.button"));
             table.push(vec![
                 format!("{}\n{}{}", release, WEB_HOME_URL, link),
                 condition,
                 price,
             ]);
         }
-        cli::print_table(vec!["Realease", "Condition", "Price"], table);
+        (links, table)
+    }
+
+    pub fn add_to_cart(&self, link: &str) {
+        self.web.get(link).send_request();
     }
 }
