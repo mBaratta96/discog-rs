@@ -17,14 +17,7 @@ pub fn print_table(header: Vec<&str>, table: &Vec<Vec<String>>) {
 
     table
         .with(Style::rounded().horizontal('-'))
-        .with(BorderColor::default().top(Color::FG_BLUE))
-        .with(BorderColor::default().bottom(Color::FG_BLUE))
-        .with(BorderColor::default().left(Color::FG_BLUE))
-        .with(BorderColor::default().right(Color::FG_BLUE))
-        .with(BorderColor::default().corner_bottom_left(Color::FG_BLUE))
-        .with(BorderColor::default().corner_bottom_right(Color::FG_BLUE))
-        .with(BorderColor::default().corner_top_left(Color::FG_BLUE))
-        .with(BorderColor::default().corner_top_right(Color::FG_BLUE))
+        .with(BorderColor::filled(Color::FG_BLUE))
         .with(Width::wrap(term_width as usize).priority::<PriorityMax>());
 
     println!("{}", table);
