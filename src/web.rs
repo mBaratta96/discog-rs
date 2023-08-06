@@ -167,7 +167,7 @@ impl DiscogsScraper {
             let format = node.get_inner_text("td[data-header='Format']");
             let year = node.get_inner_text("td[data-header='Year']");
             links.push(node.get_link("span.marketplace_for_sale_count > a"));
-            table.push(vec![album_info, format, year, album_sellers]);
+            table.push(vec![album_sellers, album_info, format, year]);
         }
         (links, table)
     }
@@ -230,10 +230,10 @@ impl DiscogsScraper {
             let amount = &amounts[i].amount;
             sellers.push(seller.to_string());
             table.push(vec![
-                condition,
                 seller.to_string(),
                 amount.to_string(),
                 shipping_from.to_string(),
+                condition,
                 price,
             ]);
         }

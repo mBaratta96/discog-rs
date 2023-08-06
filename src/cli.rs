@@ -1,6 +1,10 @@
 use inquire::{validator::Validation, CustomType};
+use owo_colors::OwoColorize;
 use tabled::builder::Builder;
-use tabled::settings::{peaker::PriorityMax, style::BorderColor, Color, Style, Width};
+use tabled::settings::Format;
+use tabled::settings::{
+    object::Columns, peaker::PriorityMax, style::BorderColor, Color, Modify, Style, Width,
+};
 use terminal_size::{terminal_size, Width as TermWidth};
 
 pub fn print_table(header: Vec<&str>, table: &Vec<Vec<String>>) {
@@ -18,6 +22,7 @@ pub fn print_table(header: Vec<&str>, table: &Vec<Vec<String>>) {
     table
         .with(Style::rounded().horizontal('-'))
         .with(BorderColor::filled(Color::FG_BLUE))
+        .with(Modify::new(Columns::single(0)).with(Format::content(|s| s.red().to_string())))
         .with(Width::wrap(term_width as usize).priority::<PriorityMax>());
 
     println!("{}", table);
