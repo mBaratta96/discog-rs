@@ -11,7 +11,7 @@ const WEB_USER_AGENT: &str =
 const API_USER_AGENT: &str = "Discogs-stats/0.0.1";
 const WEB_HOME_URL: &str = "https://www.discogs.com";
 const API_HOME_URL: &str = "https://api.discogs.com";
-const CONCURRENT_REQUESTS: usize = 20;
+const CONCURRENT_MAX_REQUESTS: usize = 50;
 
 #[derive(Serialize, Deserialize)]
 struct Cookie {
@@ -191,6 +191,7 @@ impl DiscogsScraper {
         let asynch_client = reqwest::Client::new();
         let amounts: Vec<Amount> = rt.block_on(
             stream::iter(amount_urls.split(" "))
+                .take(CONCURRENT_MAX_REQUESTS)
                 .map(|seller| {
                     let url = format!("{}/marketplace/mywants/{}/amount", API_HOME_URL, seller);
                     let client = &asynch_client;
@@ -209,7 +210,7 @@ impl DiscogsScraper {
                         }
                     }
                 })
-                .buffer_unordered(CONCURRENT_REQUESTS)
+                .buffer_unordered(CONCURRENT_MAX_REQUESTS)
                 .collect(),
         );
         let selector = scraper::Selector::parse("tr.shortcut_navigable").unwrap();
