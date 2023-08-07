@@ -185,12 +185,12 @@ impl DiscogsScraper {
             .enable_all()
             .build()
             .unwrap();
-        let sellers_names = sellers_page
+        let sellers_names: Vec<String> = sellers_page
             .root_element()
             .get_inner_text("td.seller_info div.seller_block a")
             .split(" ")
             .map(&str::to_string)
-            .collect::<Vec<String>>();
+            .collect();
         let asynch_client = reqwest::Client::new();
         let amounts: Vec<String> = rt.block_on(
             stream::iter(sellers_names.iter())
