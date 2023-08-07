@@ -82,7 +82,7 @@ impl ExtendedNode for scraper::ElementRef<'_> {
     fn get_inner_text(&self, query: &str) -> String {
         let selector = scraper::Selector::parse(query).unwrap();
         self.select(&selector)
-            .flat_map(|e| e.text().map(|t| t.trim()))
+            .flat_map(|e| e.text().map(&str::trim))
             .join(" ")
     }
     fn get_link(&self, query: &str) -> String {
@@ -185,12 +185,15 @@ impl DiscogsScraper {
             .enable_all()
             .build()
             .unwrap();
-        let amount_urls = &sellers_page
+        let sellers_names = sellers_page
             .root_element()
-            .get_inner_text("td.seller_info div.seller_block a");
+            .get_inner_text("td.seller_info div.seller_block a")
+            .split(" ")
+            .map(&str::to_string)
+            .collect::<Vec<String>>();
         let asynch_client = reqwest::Client::new();
-        let amounts: Vec<Amount> = rt.block_on(
-            stream::iter(amount_urls.split(" "))
+        let amounts: Vec<String> = rt.block_on(
+            stream::iter(sellers_names.iter())
                 .take(CONCURRENT_MAX_REQUESTS)
                 .map(|seller| {
                     let url = format!("{}/marketplace/mywants/{}/amount", API_HOME_URL, seller);
@@ -204,15 +207,13 @@ impl DiscogsScraper {
                         let body = res.text().await.unwrap();
                         let amount: serde_json::Value =
                             serde_json::from_str(&body).expect("Error parsing json");
-                        Amount {
-                            amount: amount["amount"].to_string(),
-                            seller: String::from(seller),
-                        }
+                        amount["amount"].to_string()
                     }
                 })
                 .buffer_unordered(CONCURRENT_MAX_REQUESTS)
                 .collect(),
         );
+
         let selector = scraper::Selector::parse("tr.shortcut_navigable").unwrap();
         let mut sellers: Vec<String> = Vec::new();
         let mut table: Vec<Vec<String>> = Vec::new();
@@ -227,8 +228,12 @@ impl DiscogsScraper {
                 .enumerate()
                 .filter_map(|(i, c)| if i != 1 { Some(c) } else { None })
                 .join("");
-            let seller = &amounts[i].seller;
-            let amount = &amounts[i].amount;
+            let seller = &sellers_names[i];
+            let amount = if i < CONCURRENT_MAX_REQUESTS {
+                &amounts[i]
+            } else {
+                ""
+            };
             sellers.push(seller.to_string());
             table.push(vec![
                 seller.to_string(),
