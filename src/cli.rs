@@ -1,3 +1,4 @@
+use clap::Parser;
 use inquire::{validator::Validation, CustomType};
 use owo_colors::OwoColorize;
 use tabled::builder::Builder;
@@ -6,6 +7,15 @@ use tabled::settings::{
     object::Columns, peaker::PriorityMax, style::BorderColor, Color, Modify, Style, Width,
 };
 use terminal_size::{terminal_size, Width as TermWidth};
+
+#[derive(Parser, Debug)]
+#[command(author, version, about, long_about = None)]
+pub struct Args {
+    pub cookies: String,
+
+    #[arg(short, long, default_value_t = String::from(""))]
+    pub wantlist: String,
+}
 
 pub fn print_table(header: Vec<&str>, table: &Vec<Vec<String>>) {
     let mut builder = Builder::default();

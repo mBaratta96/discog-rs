@@ -1,9 +1,9 @@
 mod cli;
 mod web;
 
-fn main() {
-    let cookies_path = std::env::args().nth(1).expect("no cookies file path given");
-    let scraper = web::DiscogsScraper::new(&cookies_path);
+use clap::Parser;
+
+fn check_wantlist(scraper: web::DiscogsScraper) {
     let (links, table) = scraper.get_random_release();
     let mut print_table = true;
     loop {
@@ -55,5 +55,29 @@ fn main() {
                 scraper.add_to_cart(&links[selected_index as usize]);
             }
         }
+    }
+}
+
+fn add_to_wantlist(scraper: web::DiscogsScraper, search: String) {
+    let (links, table) = scraper.search_release(&search);
+    cli::print_table(vec!["Release", "Status", "Info", "Details"], &table);
+    let len = links.len() as i32;
+    let selected_index = cli::ask_id(len, "Select an ID:");
+    if selected_index == -1 {
+        std::process::exit(0);
+    }
+    let link = &links[selected_index as usize];
+    println!("{}", link);
+    scraper.add_lps_to_wantlist(link);
+}
+
+fn main() {
+    let args = cli::Args::parse();
+    let cookies_path = args.cookies;
+    let scraper = web::DiscogsScraper::new(&cookies_path);
+    if args.wantlist.len() > 0 {
+        add_to_wantlist(scraper, args.wantlist);
+    } else {
+        check_wantlist(scraper);
     }
 }

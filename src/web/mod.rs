@@ -1,10 +1,12 @@
+mod types;
+
 use futures::{stream, StreamExt};
 use itertools::Itertools;
-use reqwest::blocking::{multipart, Client as ReqwestClient, RequestBuilder};
+use reqwest::blocking::{multipart, Client as ReqwestClient};
 use reqwest::header::{HeaderMap, HeaderValue, AUTHORIZATION, COOKIE, USER_AGENT};
 use reqwest::redirect;
-use serde::{Deserialize, Serialize};
 use serde_json;
+use types::*;
 
 const WEB_USER_AGENT: &str =
     "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:109.0) Gecko/20100101 Firefox/116.0";
@@ -12,97 +14,21 @@ const API_USER_AGENT: &str = "Discogs-stats/0.0.1";
 const WEB_HOME_URL: &str = "https://www.discogs.com";
 const API_HOME_URL: &str = "https://api.discogs.com";
 const CONCURRENT_MAX_REQUESTS: usize = 50;
+const VERSION: usize = 1;
+const OPERATION_NAME: &str = "AddReleasesToWantlist";
+const SHA256HASH: &str = "d07fa55f88404b5d0e5253faf962ed104ad1efd3af871c9281b76e874d4a2bf4";
 
-#[derive(Serialize, Deserialize)]
-struct Cookie {
-    name: String,
-    value: String,
-}
-
-#[derive(Serialize, Deserialize)]
-struct Artist {
-    name: String,
-}
-
-#[derive(Serialize, Deserialize)]
-struct Release {
-    title: String,
-    artists: Vec<Artist>,
-}
-
-#[derive(Serialize, Deserialize)]
-struct Script {
-    authorization: String,
-}
-#[derive(Serialize, Deserialize)]
-struct Amount {
-    amount: String,
-    seller: String,
-}
-
-#[derive(Debug)]
-struct Client {
-    client: ReqwestClient,
-    home: String,
+fn create_cookie_header(path: &str) -> String {
+    let data = std::fs::read_to_string(path).expect("Unable to read file");
+    let parsed_cookies: Vec<Cookie> =
+        serde_json::from_str(&data).expect("Unable to parse Json file.");
+    parsed_cookies.iter().map(Cookie::to_string).join("; ")
 }
 
 #[derive(Debug)]
 pub struct DiscogsScraper {
     web: Client,
     api: Client,
-}
-
-fn create_cookie_header(path: &str) -> String {
-    let data = std::fs::read_to_string(path).expect("Unable to read file");
-    let parsed_cookies: Vec<Cookie> =
-        serde_json::from_str(&data).expect("Unable to parse Json file.");
-    parsed_cookies
-        .iter()
-        .map(|cookie| format!("{}={}", cookie.name, cookie.value))
-        .join("; ")
-}
-
-trait Send {
-    fn send_request(self) -> String;
-}
-
-impl Send for RequestBuilder {
-    fn send_request(self) -> String {
-        let res = self.send().expect("Failed random item.");
-        res.text().unwrap()
-    }
-}
-
-trait ExtendedNode {
-    fn get_inner_text(&self, query: &str) -> String;
-    fn get_link(&self, query: &str) -> String;
-}
-
-impl ExtendedNode for scraper::ElementRef<'_> {
-    fn get_inner_text(&self, query: &str) -> String {
-        let selector = scraper::Selector::parse(query).unwrap();
-        self.select(&selector)
-            .flat_map(|e| e.text().map(&str::trim))
-            .join(" ")
-    }
-    fn get_link(&self, query: &str) -> String {
-        let selector = scraper::Selector::parse(query).unwrap();
-        match self.select(&selector).next() {
-            Some(link) => link.value().attr("href").unwrap().to_string(),
-            None => String::from(""),
-        }
-    }
-}
-
-impl Client {
-    fn post(&self, url: &str) -> RequestBuilder {
-        let url = format!("{}/{}", &self.home, url);
-        self.client.post(url)
-    }
-
-    fn get(&self, url: &str) -> RequestBuilder {
-        self.client.get(format!("{}/{}", &self.home, url))
-    }
 }
 
 impl DiscogsScraper {
@@ -123,14 +49,8 @@ impl DiscogsScraper {
             .build()
             .unwrap();
         DiscogsScraper {
-            web: Client {
-                client: web_client,
-                home: String::from(WEB_HOME_URL),
-            },
-            api: Client {
-                client: api_client,
-                home: String::from(API_HOME_URL),
-            },
+            web: Client::new(web_client, WEB_HOME_URL),
+            api: Client::new(api_client, API_HOME_URL),
         }
     }
     pub fn get_random_release(&self) -> (Vec<String>, Vec<Vec<String>>) {
@@ -149,9 +69,8 @@ impl DiscogsScraper {
         let release_res = self
             .api
             .get(format!("releases/{}", random_release_id).as_str());
-        let document = release_res.send_request();
-        let release: Release = serde_json::from_str(&document).expect("Unable to parse Json file.");
-        let artists = release.artists.iter().map(|a| a.name.to_string()).join(" ");
+        let release: Release = release_res.send_request_json();
+        let artists = release.get_artists();
         println!("Found {} - {}", release.title, artists);
         let res = self
             .web
@@ -179,8 +98,9 @@ impl DiscogsScraper {
             .root_element()
             .get_inner_text("script#dsdata")
             .replace("\n", "")[41..1702];
-        let script: Script = serde_json::from_str(script).expect("Unable to parse Json file.");
-        let token = script.authorization;
+        let script: serde_json::Value =
+            serde_json::from_str(script).expect("Unable to parse Json file.");
+        let token = script["authorization"].to_string();
         let rt = tokio::runtime::Builder::new_multi_thread()
             .enable_all()
             .build()
@@ -203,8 +123,7 @@ impl DiscogsScraper {
                         .header(AUTHORIZATION, &token)
                         .header(USER_AGENT, API_USER_AGENT);
                     async move {
-                        let res = req.send().await.unwrap();
-                        let body = res.text().await.unwrap();
+                        let body = req.send().await.unwrap().text().await.unwrap();
                         let amount: serde_json::Value =
                             serde_json::from_str(&body).expect("Error parsing json");
                         amount["amount"].to_string()
@@ -272,5 +191,48 @@ impl DiscogsScraper {
 
     pub fn add_to_cart(&self, link: &str) {
         self.web.get(link).send_request();
+    }
+
+    pub fn search_release(&self, search: &str) -> (Vec<String>, Vec<Vec<String>>) {
+        let url = format!(
+            "search/?q={}&type=master&layout=sm",
+            search.replace(" ", "+")
+        );
+        let res = self.web.get(&url);
+        let search_page = scraper::Html::parse_document(&res.send_request());
+        let selector = scraper::Selector::parse("li.card div.card_body").unwrap();
+        let mut table: Vec<Vec<String>> = Vec::new();
+        let mut links: Vec<String> = Vec::new();
+        for node in search_page.select(&selector) {
+            let release = node
+                .get_inner_text("h4[role='none']")
+                .trim()
+                .replace("  ", " ");
+            links.push(node.get_link("h4[role='none'] > a"));
+            let status = node.get_inner_text("p.card_status");
+            let info = node.get_inner_text("p.card_info").trim().replace("  ", " ");
+            let details = node.get_inner_text("div.search_result_details");
+            table.push(vec![release, status, info, details]);
+        }
+        (links, table)
+    }
+
+    pub fn add_lps_to_wantlist(&self, url: &str) {
+        let master_release_id = url.split("-").next().unwrap().to_owned()
+            + "/as_json?filter=1&is_mobile=0&return_field=id&format=LP";
+        let res = self.web.get(&master_release_id);
+        let results: LPRelease = res.send_request_json();
+        let extensions = Extensions::new(OPERATION_NAME, SHA256HASH, VERSION);
+        let variables = Variables::new(results.get_ids());
+        let add_wantlist = AddWantlist {
+            extensions,
+            variables,
+        };
+        let res = self
+            .web
+            .post("service/catalog/api/graphql")
+            .body(serde_json::to_string(&add_wantlist).unwrap());
+        let body = res.send_request();
+        println!("{}", body);
     }
 }
