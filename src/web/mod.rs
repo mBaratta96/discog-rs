@@ -17,6 +17,8 @@ const CONCURRENT_MAX_REQUESTS: usize = 50;
 const VERSION: usize = 1;
 const OPERATION_NAME: &'static str = "AddReleasesToWantlist";
 const SHA256HASH: &'static str = "d07fa55f88404b5d0e5253faf962ed104ad1efd3af871c9281b76e874d4a2bf4";
+const GETLP: &'static str = "/as_json?filter=1&is_mobile=0&return_field=id&format=LP";
+const ADDLPWANTLIST: &'static str
 
 fn create_cookie_header(path: &str) -> String {
     let data = std::fs::read_to_string(path).expect("Unable to read file");
@@ -208,8 +210,7 @@ impl DiscogsScraper {
     }
 
     pub fn add_lps_to_wantlist(&self, url: &str) {
-        let master_release_id = url.split("-").next().unwrap().to_owned()
-            + "/as_json?filter=1&is_mobile=0&return_field=id&format=LP";
+        let master_release_id = url.split("-").next().unwrap().to_string() + GETLP;
         let res = self.web.get(&master_release_id);
         let results: LPRelease = res.send_request_json();
         let extensions = Extensions::new(OPERATION_NAME, SHA256HASH, VERSION);
@@ -218,10 +219,7 @@ impl DiscogsScraper {
             extensions,
             variables,
         };
-        let res = self
-            .web
-            .post("service/catalog/api/graphql")
-            .body(serde_json::to_string(&add_wantlist).unwrap());
+        let res = self.web.post(ADDLPWANTLIST).body(serde_json::to_string(&add_wantlist).unwrap());
         let body = res.send_request();
         match serde_json::from_str::<ErrorMessage>(&body) {
             Ok(e) => println!("{:#?}", e.get_messages()),
