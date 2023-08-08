@@ -4,7 +4,7 @@ mod web;
 use clap::Parser;
 
 fn check_wantlist(scraper: web::DiscogsScraper) {
-    let (links, table) = scraper.get_random_release().unwrap();
+    let (links, table) = scraper.get_random_release();
     let mut print_table = true;
     loop {
         if print_table {
@@ -25,7 +25,7 @@ fn check_wantlist(scraper: web::DiscogsScraper) {
         }
         print_table = true;
         let selected = &links[selected_index as usize];
-        let (sellers, table) = scraper.get_sellers(selected).unwrap();
+        let (sellers, table) = scraper.get_sellers(selected);
         loop {
             cli::print_table(
                 vec!["Seller", "Amount", "Shipping From", "Condition", "Price"],
@@ -73,7 +73,7 @@ fn add_to_wantlist(scraper: web::DiscogsScraper, search: &str) {
 fn main() {
     let args = cli::Args::parse();
     let cookies_path = args.cookies;
-    let scraper = web::DiscogsScraper::new(&cookies_path).expect("Unable to create scraper.");
+    let scraper = web::DiscogsScraper::new(&cookies_path);
     if args.wantlist.len() > 0 {
         add_to_wantlist(scraper, &args.wantlist);
     } else {
