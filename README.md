@@ -12,6 +12,7 @@ soon.
 ## Usage
 
 '''shell 
+
 Usage: discogs [OPTIONS] <COOKIES>
 
 Arguments:
@@ -21,4 +22,5 @@ Options:
   -w, --wantlist <WANTLIST>  [default: ]
   -h, --help                 Print help
   -V, --version              Print version
+
 '''
