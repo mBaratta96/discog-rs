@@ -4,7 +4,7 @@ mod web;
 use clap::Parser;
 
 fn check_wantlist(scraper: web::DiscogsScraper) {
-    let (links, table) = scraper.get_random_release();
+    let (links, table) = scraper.get_random_release().unwrap();
     let mut print_table = true;
     loop {
         if print_table {
@@ -24,8 +24,8 @@ fn check_wantlist(scraper: web::DiscogsScraper) {
             continue;
         }
         print_table = true;
-        let selected = links.get(selected_index as usize).unwrap();
-        let (sellers, table) = scraper.get_sellers(selected);
+        let selected = &links[selected_index as usize];
+        let (sellers, table) = scraper.get_sellers(selected).unwrap();
         loop {
             cli::print_table(
                 vec!["Seller", "Amount", "Shipping From", "Condition", "Price"],
@@ -58,7 +58,7 @@ fn check_wantlist(scraper: web::DiscogsScraper) {
     }
 }
 
-fn add_to_wantlist(scraper: web::DiscogsScraper, search: String) {
+fn add_to_wantlist(scraper: web::DiscogsScraper, search: &str) {
     let (links, table) = scraper.search_release(&search);
     cli::print_table(vec!["Release", "Status", "Info", "Details"], &table);
     let len = links.len() as i32;
@@ -73,9 +73,9 @@ fn add_to_wantlist(scraper: web::DiscogsScraper, search: String) {
 fn main() {
     let args = cli::Args::parse();
     let cookies_path = args.cookies;
-    let scraper = web::DiscogsScraper::new(&cookies_path);
+    let scraper = web::DiscogsScraper::new(&cookies_path).expect("Unable to create scraper.");
     if args.wantlist.len() > 0 {
-        add_to_wantlist(scraper, args.wantlist);
+        add_to_wantlist(scraper, &args.wantlist);
     } else {
         check_wantlist(scraper);
     }

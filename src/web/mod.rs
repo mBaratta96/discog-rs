@@ -8,15 +8,15 @@ use reqwest::redirect;
 use serde_json;
 use types::*;
 
-const WEB_USER_AGENT: &str =
+const WEB_USER_AGENT: &'static str =
     "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:109.0) Gecko/20100101 Firefox/116.0";
-const API_USER_AGENT: &str = "Discogs-stats/0.0.1";
-const WEB_HOME_URL: &str = "https://www.discogs.com";
-const API_HOME_URL: &str = "https://api.discogs.com";
+const API_USER_AGENT: &'static str = "Discogs-stats/0.0.1";
+const WEB_HOME_URL: &'static str = "https://www.discogs.com";
+const API_HOME_URL: &'static str = "https://api.discogs.com";
 const CONCURRENT_MAX_REQUESTS: usize = 50;
 const VERSION: usize = 1;
-const OPERATION_NAME: &str = "AddReleasesToWantlist";
-const SHA256HASH: &str = "d07fa55f88404b5d0e5253faf962ed104ad1efd3af871c9281b76e874d4a2bf4";
+const OPERATION_NAME: &'static str = "AddReleasesToWantlist";
+const SHA256HASH: &'static str = "d07fa55f88404b5d0e5253faf962ed104ad1efd3af871c9281b76e874d4a2bf4";
 
 fn create_cookie_header(path: &str) -> String {
     let data = std::fs::read_to_string(path).expect("Unable to read file");
@@ -48,10 +48,11 @@ impl DiscogsScraper {
             .user_agent(API_USER_AGENT)
             .build()
             .unwrap();
-        DiscogsScraper {
+        let scraper = DiscogsScraper {
             web: Client::new(web_client, WEB_HOME_URL),
             api: Client::new(api_client, API_HOME_URL),
-        }
+        };
+        scraper
     }
     pub fn get_random_release(&self) -> (Vec<String>, Vec<Vec<String>>) {
         let form = multipart::Form::new().text("Action.RandomItem", "Random+Item");
