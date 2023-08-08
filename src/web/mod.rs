@@ -105,15 +105,13 @@ impl DiscogsScraper {
             .enable_all()
             .build()
             .unwrap();
-        let sellers_names: Vec<String> = sellers_page
+        let sellers_names = sellers_page
             .root_element()
-            .get_inner_text("td.seller_info div.seller_block a")
-            .split(" ")
-            .map(&str::to_string)
-            .collect();
+            .get_inner_text("td.seller_info div.seller_block a");
+        let sellers: Vec<&str> = sellers_names.split(" ").collect();
         let asynch_client = reqwest::Client::new();
-        let amounts: Vec<String> = rt.block_on(
-            stream::iter(sellers_names.iter())
+        let amounts: Vec<usize> = rt.block_on(
+            stream::iter(&sellers)
                 .take(CONCURRENT_MAX_REQUESTS)
                 .map(|seller| {
                     let url = format!("{}/marketplace/mywants/{}/amount", API_HOME_URL, seller);
@@ -126,8 +124,7 @@ impl DiscogsScraper {
                         let body = req.send().await.unwrap().text().await.unwrap();
                         let amount: Amount =
                             serde_json::from_str(&body).expect("Error parsing json");
-                        println!("{:#?}", amount);
-                        amount.amount.to_string()
+                        amount.amount
                     }
                 })
                 .buffer_unordered(CONCURRENT_MAX_REQUESTS)
@@ -137,7 +134,8 @@ impl DiscogsScraper {
         let selector = scraper::Selector::parse("tr.shortcut_navigable").unwrap();
         let mut table: Vec<Vec<String>> = Vec::new();
         for (i, node) in sellers_page.select(&selector).enumerate() {
-            let shipping_from = &node.get_inner_text("td.seller_info ul li:nth-child(3)")[12..];
+            let shipping_from =
+                node.get_inner_text("td.seller_info ul li:nth-child(3)")[12..].to_string();
             let price = node.get_inner_text("td.item_price span.price");
             let condition =
                 node.get_inner_text("p.item_condition > *:not(.condition-label-desktop)");
@@ -147,19 +145,13 @@ impl DiscogsScraper {
                 .enumerate()
                 .filter_map(|(i, c)| if i != 1 { Some(c) } else { None })
                 .join("");
-            let seller = &sellers_names[i];
+            let seller = sellers[i].to_string();
             let amount = if i < CONCURRENT_MAX_REQUESTS {
-                &amounts[i]
+                amounts[i].to_string()
             } else {
-                ""
+                "".to_string()
             };
-            table.push(vec![
-                seller.to_string(),
-                amount.to_string(),
-                shipping_from.to_string(),
-                condition,
-                price,
-            ]);
+            table.push(vec![seller, amount, shipping_from, condition, price]);
         }
 
         table
