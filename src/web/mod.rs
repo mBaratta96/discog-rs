@@ -65,12 +65,10 @@ impl DiscogsScraper {
             .unwrap()
             .split("-")
             .next()
-            .unwrap()
-            .to_string();
-        let release_res = self
-            .api
-            .get(format!("releases/{}", random_release_id).as_str());
-        let release: Release = release_res.send_request_json();
+            .unwrap();
+        let url = format!("releases/{}", random_release_id);
+        let res = self.api.get(&url);
+        let release: Release = res.send_request_json();
         let artists = release.get_artists();
         println!("Found {} - {}", release.title, artists);
         let res = self
@@ -95,11 +93,12 @@ impl DiscogsScraper {
     pub fn get_sellers(&self, sellers_link: &str) -> Vec<Vec<String>> {
         let res = self.web.get(sellers_link);
         let sellers_page = scraper::Html::parse_document(&res.send_request());
-        let script = &sellers_page
+        let script = sellers_page
             .root_element()
             .get_inner_text("script#dsdata")
-            .replace("\n", "")[41..1702];
-        let script: Script = serde_json::from_str(script).expect("Unable to parse Json file.");
+            .replace("\n", "");
+        let script: Script =
+            serde_json::from_str(&script[41..1702]).expect("Unable to parse Json file.");
         let token = script.authorization;
         let rt = tokio::runtime::Builder::new_multi_thread()
             .enable_all()
