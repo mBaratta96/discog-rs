@@ -25,6 +25,16 @@ pub struct Release {
     artists: Vec<Artist>,
 }
 
+#[derive(Serialize, Deserialize)]
+pub struct Script {
+    pub authorization: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct Amount {
+    pub amount: usize,
+}
+
 impl Release {
     pub fn get_artists(&self) -> String {
         self.artists.iter().map(|a| a.name.to_string()).join(" ")

@@ -92,16 +92,15 @@ impl DiscogsScraper {
         (links, table)
     }
 
-    pub fn get_sellers(&self, sellers_link: &str) -> (Vec<String>, Vec<Vec<String>>) {
+    pub fn get_sellers(&self, sellers_link: &str) -> Vec<Vec<String>> {
         let res = self.web.get(sellers_link);
         let sellers_page = scraper::Html::parse_document(&res.send_request());
         let script = &sellers_page
             .root_element()
             .get_inner_text("script#dsdata")
             .replace("\n", "")[41..1702];
-        let script: serde_json::Value =
-            serde_json::from_str(script).expect("Unable to parse Json file.");
-        let token = script["authorization"].to_string();
+        let script: Script = serde_json::from_str(script).expect("Unable to parse Json file.");
+        let token = script.authorization;
         let rt = tokio::runtime::Builder::new_multi_thread()
             .enable_all()
             .build()
@@ -122,12 +121,13 @@ impl DiscogsScraper {
                     let req = client
                         .get(&url)
                         .header(AUTHORIZATION, &token)
-                        .header(USER_AGENT, API_USER_AGENT);
+                        .header(USER_AGENT, WEB_USER_AGENT);
                     async move {
                         let body = req.send().await.unwrap().text().await.unwrap();
-                        let amount: serde_json::Value =
+                        let amount: Amount =
                             serde_json::from_str(&body).expect("Error parsing json");
-                        amount["amount"].to_string()
+                        println!("{:#?}", amount);
+                        amount.amount.to_string()
                     }
                 })
                 .buffer_unordered(CONCURRENT_MAX_REQUESTS)
@@ -135,7 +135,6 @@ impl DiscogsScraper {
         );
 
         let selector = scraper::Selector::parse("tr.shortcut_navigable").unwrap();
-        let mut sellers: Vec<String> = Vec::new();
         let mut table: Vec<Vec<String>> = Vec::new();
         for (i, node) in sellers_page.select(&selector).enumerate() {
             let shipping_from = &node.get_inner_text("td.seller_info ul li:nth-child(3)")[12..];
@@ -154,7 +153,6 @@ impl DiscogsScraper {
             } else {
                 ""
             };
-            sellers.push(seller.to_string());
             table.push(vec![
                 seller.to_string(),
                 amount.to_string(),
@@ -164,7 +162,7 @@ impl DiscogsScraper {
             ]);
         }
 
-        (sellers, table)
+        table
     }
 
     pub fn get_seller_items(&self, seller: &str) -> (Vec<String>, Vec<Vec<String>>) {

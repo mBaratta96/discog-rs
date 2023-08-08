@@ -25,13 +25,13 @@ fn check_wantlist(scraper: web::DiscogsScraper) {
         }
         print_table = true;
         let selected = &links[selected_index as usize];
-        let (sellers, table) = scraper.get_sellers(selected);
+        let table = scraper.get_sellers(selected);
         loop {
             cli::print_table(
                 vec!["Seller", "Amount", "Shipping From", "Condition", "Price"],
                 &table,
             );
-            let len = sellers.len() as i32;
+            let len = table.len() as i32;
             let selected_index = cli::ask_id(len, "Select an ID:");
             if selected_index == -1 {
                 std::process::exit(0);
@@ -39,8 +39,7 @@ fn check_wantlist(scraper: web::DiscogsScraper) {
             if selected_index == len {
                 break;
             }
-
-            let selected = &sellers[selected_index as usize];
+            let selected = &table[selected_index as usize][0];
             let (links, table) = scraper.get_seller_items(selected);
             cli::print_table(vec!["Realease", "Condition", "Price"], &table);
             loop {
