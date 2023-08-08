@@ -100,6 +100,32 @@ pub struct AddWantlist {
     pub variables: Variables,
 }
 
+#[derive(Serialize, Deserialize)]
+struct Message {
+    message: String,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct ErrorMessage {
+    errors: Vec<Message>,
+}
+
+impl ErrorMessage {
+    pub fn get_messages(&self) -> Vec<String> {
+        self.errors
+            .iter()
+            .map(|m| m.message.to_string())
+            .collect::<Vec<String>>()
+    }
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AddedItems {
+    discogs_id: i64,
+    added_at: String,
+}
+
 #[derive(Debug)]
 pub struct Client {
     client: ReqwestClient,

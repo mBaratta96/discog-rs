@@ -67,7 +67,6 @@ fn add_to_wantlist(scraper: web::DiscogsScraper, search: String) {
         std::process::exit(0);
     }
     let link = &links[selected_index as usize];
-    println!("{}", link);
     scraper.add_lps_to_wantlist(link);
 }
 

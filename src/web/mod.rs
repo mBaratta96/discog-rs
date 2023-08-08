@@ -233,6 +233,16 @@ impl DiscogsScraper {
             .post("service/catalog/api/graphql")
             .body(serde_json::to_string(&add_wantlist).unwrap());
         let body = res.send_request();
-        println!("{}", body);
+        match serde_json::from_str::<ErrorMessage>(&body) {
+            Ok(e) => println!("{:#?}", e.get_messages()),
+            Err(_) => {
+                let success_body: serde_json::Value =
+                    serde_json::from_str(&body).expect("Can't parse json");
+                let objects =
+                    &success_body["data"]["addReleasesToWantlist"]["wantlistItems"].to_string();
+                let items_added: Vec<AddedItems> = serde_json::from_str(&objects).unwrap();
+                println!("Added {} items to wantlist.", items_added.len());
+            }
+        }
     }
 }
