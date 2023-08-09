@@ -109,7 +109,7 @@ pub fn select_operation() -> MenuOptions {
 pub fn ask_id(len: usize, request: &str) -> usize {
     let selection = CustomType::<usize>::new(request)
         .with_validator(move |input: &usize| {
-            if (0..=len).contains(input) {
+            if (0..len).contains(input) {
                 Ok(Validation::Valid)
             } else {
                 Ok(Validation::Invalid("Input outside of index range.".into()))
