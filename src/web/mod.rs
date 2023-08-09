@@ -73,10 +73,11 @@ impl DiscogsScraper {
         let res = self.api.get(&url);
         let release: Release = res.send_request_json();
         let artists = release.get_artists();
-        println!("Found {} - {}", release.title, artists);
-        let res = self
-            .web
-            .get(&format!("mywantlist?limit=250&search={}", release.title));
+        println!("Found: {} - {}", release.title, artists);
+        let res = self.web.get(&format!(
+            "mywantlist?limit=250&search={} {}",
+            release.title, artists
+        ));
         let search_page = scraper::Html::parse_document(&res.send_request());
         let selector = scraper::Selector::parse("tr.shortcut_navigable").unwrap();
         let releases = search_page.select(&selector);
