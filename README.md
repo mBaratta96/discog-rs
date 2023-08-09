@@ -6,6 +6,8 @@ Web scraping command-line tool for [Discogs](https://www.discogs.com/).
 
 - Add items to your wantlist (LP only).
 
+- Check your cart.
+
 This is a hobby project, and I'm not planning to introduce new features anytime
 soon.
 
@@ -21,14 +23,19 @@ automatically.
 
 ```shell 
 
-Usage: discogs [OPTIONS] <COOKIES>
+Usage: discogs <COOKIES> <COMMAND>
+
+Commands:
+  add       
+  cart      
+  wantlist  
+  help      Print this message or the help of the given subcommand(s)
 
 Arguments:
-  <COOKIES>
+  <COOKIES>  
 
 Options:
-  -w, --wantlist <WANTLIST>  [default: ]
-  -h, --help                 Print help
-  -V, --version              Print version
+  -h, --help     Print help
+  -V, --version  Print version
 
 ```
