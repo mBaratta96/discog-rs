@@ -179,9 +179,14 @@ impl Send for RequestBuilder {
 pub trait ExtendedNode {
     fn get_inner_text(&self, query: &str) -> String;
     fn get_link(&self, query: &str) -> String;
+    fn get_text(&self) -> String;
 }
 
 impl ExtendedNode for scraper::ElementRef<'_> {
+    fn get_text(&self) -> String {
+        self.text().map(|e| e.trim()).join(" ")
+    }
+
     fn get_inner_text(&self, query: &str) -> String {
         let selector = scraper::Selector::parse(query).unwrap();
         self.select(&selector)

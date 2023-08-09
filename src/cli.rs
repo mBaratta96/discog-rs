@@ -33,20 +33,23 @@ pub enum TableType {
 }
 
 pub fn print_table(
-    header: Vec<&str>,
+    header: &'static [&str],
     table: &Vec<Vec<String>>,
     title: &str,
     table_type: TableType,
 ) {
     let mut builder = Builder::default();
 
-    builder.set_header(header);
+    builder.set_header(header.to_vec());
     for row in table.iter() {
         builder.push_record(row);
     }
 
-    let builder = builder.index();
-    let mut formatted_table = builder.build();
+    let mut formatted_table = match table_type {
+        TableType::Default => builder.index().build(),
+        TableType::Cart => builder.build(),
+    };
+
     let (TermWidth(term_width), _) = terminal_size().expect("Failed to get terminal size.");
 
     formatted_table
@@ -59,8 +62,16 @@ pub fn print_table(
     match table_type {
         TableType::Default => formatted_table
             .with(Modify::new(Columns::first()).with(Format::content(|s| s.red().to_string()))),
-        TableType::Cart => formatted_table
-            .with(Modify::new(Rows::last()).with(Format::content(|s| s.red().to_string()))),
+        TableType::Cart => {
+            formatted_table
+                .with(Modify::new(Rows::first()).with(Format::content(|s| s.red().to_string())));
+            // +2 Because of title and header
+            let subtotal_index = table.iter().position(|row| row[0] == "Subtotal").unwrap() + 2;
+            formatted_table.with(
+                Modify::new(Rows::new(subtotal_index..))
+                    .with(Format::content(|s| s.red().to_string())),
+            )
+        }
     };
 
     println!("{}", formatted_table);

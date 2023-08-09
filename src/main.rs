@@ -4,18 +4,20 @@ mod web;
 use clap::Parser;
 use cli::Commands::*;
 use cli::TableType;
+use core::iter::zip;
+
+const WANTIST_HEADER: &[&str] = &["Sellers", "Title", "Format", "Year"];
+const SELLERS_HEADER: &[&str] = &["Seller", "Amount", "Shipping From", "Condition", "Price"];
+const ITEMS_HEADER: &[&str] = &["Realease", "Condition", "Price"];
+const RELEASE_HEADER: &[&str] = &["Release", "Status", "Info", "Details"];
+const CART_HEADER: &[&str] = &["Description", "Price"];
 
 fn check_wantlist(scraper: web::DiscogsScraper) {
     let (links, table) = scraper.get_random_release();
     let mut print_table = true;
     loop {
         if print_table {
-            cli::print_table(
-                vec!["Sellers", "Title", "Format", "Year"],
-                &table,
-                "Releases",
-                TableType::Default,
-            );
+            cli::print_table(WANTIST_HEADER, &table, "Releases", TableType::Default);
         }
         let len = links.len() as i32;
         let selected_index = cli::ask_id(len, "Select an ID:");
@@ -34,12 +36,7 @@ fn check_wantlist(scraper: web::DiscogsScraper) {
         let selected = &links[selected_index as usize];
         let table = scraper.get_sellers(selected);
         loop {
-            cli::print_table(
-                vec!["Seller", "Amount", "Shipping From", "Condition", "Price"],
-                &table,
-                "Sellers",
-                TableType::Default,
-            );
+            cli::print_table(SELLERS_HEADER, &table, "Sellers", TableType::Default);
             let len = table.len() as i32;
             let selected_index = cli::ask_id(len, "Select an ID:");
             if selected_index == -1 {
@@ -51,7 +48,7 @@ fn check_wantlist(scraper: web::DiscogsScraper) {
             let selected = &table[selected_index as usize][0];
             let (links, table) = scraper.get_seller_items(selected);
             cli::print_table(
-                vec!["Realease", "Condition", "Price"],
+                ITEMS_HEADER,
                 &table,
                 &format!("{} Items", selected),
                 TableType::Default,
@@ -74,7 +71,7 @@ fn check_wantlist(scraper: web::DiscogsScraper) {
 fn add_to_wantlist(scraper: web::DiscogsScraper, search: &str) {
     let (links, table) = scraper.search_release(&search);
     cli::print_table(
-        vec!["Release", "Status", "Info", "Details"],
+        RELEASE_HEADER,
         &table,
         "Master Releases",
         TableType::Default,
@@ -88,7 +85,12 @@ fn add_to_wantlist(scraper: web::DiscogsScraper, search: &str) {
     scraper.add_lps_to_wantlist(link);
 }
 
-fn get_cart(scraper: web::DiscogsScraper) {}
+fn get_cart(scraper: web::DiscogsScraper) {
+    let (sellers, tables) = scraper.get_cart();
+    for (seller, table) in zip(sellers, tables) {
+        cli::print_table(CART_HEADER, &table, &seller, TableType::Cart);
+    }
+}
 
 fn main() {
     let args = cli::Args::parse();

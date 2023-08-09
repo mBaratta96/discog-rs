@@ -1,27 +1,25 @@
 mod types;
-
-use std::collections::HashMap;
-
 use futures::{stream, StreamExt};
 use itertools::Itertools;
 use reqwest::blocking::{multipart, Client as ReqwestClient};
 use reqwest::header::{HeaderMap, HeaderValue, AUTHORIZATION, COOKIE, USER_AGENT};
 use reqwest::redirect;
 use serde_json;
+use std::collections::HashMap;
 use types::*;
 
-const WEB_USER_AGENT: &'static str =
+const WEB_USER_AGENT: &str =
     "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:109.0) Gecko/20100101 Firefox/116.0";
-const API_USER_AGENT: &'static str = "Discogs-stats/0.0.1";
-const WEB_HOME_URL: &'static str = "https://www.discogs.com";
-const API_HOME_URL: &'static str = "https://api.discogs.com";
+const API_USER_AGENT: &str = "Discogs-stats/0.0.1";
+const WEB_HOME_URL: &str = "https://www.discogs.com";
+const API_HOME_URL: &str = "https://api.discogs.com";
 const CONCURRENT_MAX_REQUESTS: usize = 50;
 const VERSION: usize = 1;
-const OPERATION_NAME: &'static str = "AddReleasesToWantlist";
-const SHA256HASH: &'static str = "d07fa55f88404b5d0e5253faf962ed104ad1efd3af871c9281b76e874d4a2bf4";
-const GETLP: &'static str = "/as_json?filter=1&is_mobile=0&return_field=id&format=LP";
-const ADDLPWANTLIST: &'static str = "service/catalog/api/graphql";
-const CART: &'static str = "sell/cart";
+const OPERATION_NAME: &str = "AddReleasesToWantlist";
+const SHA256HASH: &str = "d07fa55f88404b5d0e5253faf962ed104ad1efd3af871c9281b76e874d4a2bf4";
+const GETLP: &str = "/as_json?filter=1&is_mobile=0&return_field=id&format=LP";
+const ADDLPWANTLIST: &str = "service/catalog/api/graphql";
+const CART: &str = "sell/cart";
 
 fn create_cookie_header(path: &str) -> String {
     let data = std::fs::read_to_string(path).expect("Unable to read file");
@@ -141,10 +139,9 @@ impl DiscogsScraper {
             let shipping_from =
                 node.get_inner_text("td.seller_info ul li:nth-child(3)")[12..].to_string();
             let price = node.get_inner_text("td.item_price span.price");
-            let condition =
-                node.get_inner_text("p.item_condition > *:not(.condition-label-desktop)");
             // remove condition description which is always found in between media and sleeve nodes
-            let condition = condition
+            let condition = node
+                .get_inner_text("p.item_condition > *:not(.condition-label-desktop)")
                 .split("   ")
                 .enumerate()
                 .filter_map(|(i, c)| if i != 1 { Some(c) } else { None })
@@ -239,8 +236,56 @@ impl DiscogsScraper {
         }
     }
 
-    pub fn get_cart(&self) {
+    pub fn get_cart(&self) -> (Vec<String>, Vec<Vec<Vec<String>>>) {
         let res = self.web.get(CART);
         let cart_page = scraper::Html::parse_document(&res.send_request());
+        let selector = scraper::Selector::parse("div.orders form").unwrap();
+        let mut tabels: Vec<Vec<Vec<String>>> = Vec::new();
+        let mut sellers: Vec<String> = Vec::new();
+        for node in cart_page.select(&selector) {
+            let mut table: Vec<Vec<String>> = Vec::new();
+            let selector = scraper::Selector::parse("table.order_list_table tr.order_row").unwrap();
+            for item in node.select(&selector) {
+                let name = item.get_inner_text("td.order-item-info a.item_link");
+                let condition = item
+                    .get_inner_text("td.order-item-info span.item_condition")
+                    .split("   ")
+                    .enumerate()
+                    .filter_map(|(i, c)| if i != 1 { Some(c) } else { None })
+                    .join("")
+                    .split_whitespace()
+                    .join(" ");
+                let link = item.get_link("td.order-item-info a.item_link");
+                let price = item.get_inner_text("td.price");
+                table.push(vec![
+                    format!("{}\n{}\n{}{}", name, condition, WEB_HOME_URL, link),
+                    price,
+                ]);
+            }
+            let subtotal =
+                node.get_inner_text("div.order_summary tr.order_subtotal td.order_summary_value");
+            let subtotal_price = subtotal.split(" ").next().unwrap()[3..]
+                .parse::<f32>()
+                .unwrap();
+            table.push(vec![String::from("Subtotal"), subtotal]);
+            let selector =
+                scraper::Selector::parse("div.order_summary select.shipping_method option")
+                    .unwrap();
+            for option in node.select(&selector) {
+                let description = option.get_text();
+                let parsed_price: f32 =
+                    option.value().attr("data-amount").unwrap().parse().unwrap();
+                let total_price = subtotal_price + parsed_price;
+                table.push(vec![description, format!("€{:.2} EUR", total_price)]);
+            }
+            tabels.push(table);
+            let seller_name = node.get_inner_text("div.box-header-row span.linked_username");
+            let seller_rating = node
+                .get_inner_text("div.box-header-row span.inline_rating small")
+                .split_whitespace()
+                .join(" ");
+            sellers.push(format!("{} {}", seller_name, seller_rating));
+        }
+        (sellers, tabels)
     }
 }
