@@ -97,9 +97,9 @@ pub fn select_operation() -> MenuOptions {
     let and = Select::new(
         "Select:",
         vec![
+            MenuOptions::SelectId,
             MenuOptions::GoBack,
             MenuOptions::Exit,
-            MenuOptions::SelectId,
         ],
     )
     .prompt();
