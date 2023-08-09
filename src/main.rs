@@ -3,7 +3,7 @@ mod web;
 
 use clap::Parser;
 use cli::Commands::*;
-use cli::TableType;
+use cli::{MenuOptions, TableType};
 use core::iter::zip;
 
 const WANTIST_HEADER: &[&str] = &["Sellers", "Title", "Format", "Year"];
@@ -19,33 +19,28 @@ fn check_wantlist(scraper: web::DiscogsScraper) {
         if print_table {
             cli::print_table(WANTIST_HEADER, &table, "Releases", TableType::Default);
         }
-        let len = links.len() as i32;
-        let selected_index = cli::ask_id(len, "Select an ID:");
-        if selected_index == -1 {
-            std::process::exit(0);
-        }
-        if selected_index == len {
-            break;
-        }
+        let mut selected_index: usize;
+        match cli::select_operation() {
+            MenuOptions::SelectId => selected_index = cli::ask_id(links.len(), "Select an Id:"),
+            MenuOptions::Exit => std::process::exit(0),
+            MenuOptions::GoBack => break,
+        };
         if links[selected_index as usize].len() == 0 {
             println!("No sellers for the selected item. Retry:");
             print_table = false;
             continue;
         }
         print_table = true;
-        let selected = &links[selected_index as usize];
+        let selected = &links[selected_index];
         let table = scraper.get_sellers(selected);
         loop {
             cli::print_table(SELLERS_HEADER, &table, "Sellers", TableType::Default);
-            let len = table.len() as i32;
-            let selected_index = cli::ask_id(len, "Select an ID:");
-            if selected_index == -1 {
-                std::process::exit(0);
-            }
-            if selected_index == len {
-                break;
-            }
-            let selected = &table[selected_index as usize][0];
+            match cli::select_operation() {
+                MenuOptions::SelectId => selected_index = cli::ask_id(table.len(), "Select an Id:"),
+                MenuOptions::Exit => std::process::exit(0),
+                MenuOptions::GoBack => break,
+            };
+            let selected = &table[selected_index][0];
             let (links, table) = scraper.get_seller_items(selected);
             cli::print_table(
                 ITEMS_HEADER,
@@ -54,14 +49,13 @@ fn check_wantlist(scraper: web::DiscogsScraper) {
                 TableType::Default,
             );
             loop {
-                let len = links.len() as i32;
-                let selected_index = cli::ask_id(len, "Want to add something to the cart?");
-                if selected_index == -1 {
-                    std::process::exit(0);
-                }
-                if selected_index == len {
-                    break;
-                }
+                match cli::select_operation() {
+                    MenuOptions::SelectId => {
+                        selected_index = cli::ask_id(links.len(), "Select an Id:")
+                    }
+                    MenuOptions::Exit => std::process::exit(0),
+                    MenuOptions::GoBack => break,
+                };
                 scraper.add_to_cart(&links[selected_index as usize]);
             }
         }
@@ -76,12 +70,12 @@ fn add_to_wantlist(scraper: web::DiscogsScraper, search: &str) {
         "Master Releases",
         TableType::Default,
     );
-    let len = links.len() as i32;
-    let selected_index = cli::ask_id(len, "Select an ID:");
-    if selected_index == -1 {
-        std::process::exit(0);
-    }
-    let link = &links[selected_index as usize];
+    let selected_index: usize;
+    match cli::select_operation() {
+        MenuOptions::SelectId => selected_index = cli::ask_id(links.len(), "Select an Id:"),
+        _ => std::process::exit(0),
+    };
+    let link = &links[selected_index];
     scraper.add_lps_to_wantlist(link);
 }
 

@@ -1,5 +1,5 @@
 use clap::{Parser, Subcommand};
-use inquire::{validator::Validation, CustomType};
+use inquire::{validator::Validation, CustomType, Select};
 use owo_colors::OwoColorize;
 use tabled::builder::Builder;
 use tabled::settings::{
@@ -30,6 +30,22 @@ pub struct Args {
 pub enum TableType {
     Default,
     Cart,
+}
+
+pub enum MenuOptions {
+    SelectId,
+    GoBack,
+    Exit,
+}
+
+impl std::fmt::Display for MenuOptions {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            MenuOptions::GoBack => write!(f, "Go Back"),
+            MenuOptions::Exit => write!(f, "Exit"),
+            MenuOptions::SelectId => write!(f, "Select Id"),
+        }
+    }
 }
 
 pub fn print_table(
@@ -77,10 +93,23 @@ pub fn print_table(
     println!("{}", formatted_table);
 }
 
-pub fn ask_id(len: i32, request: &str) -> i32 {
-    let selection = CustomType::<i32>::new(request)
-        .with_validator(move |input: &i32| {
-            if (-1..=len).contains(input) {
+pub fn select_operation() -> MenuOptions {
+    let and = Select::new(
+        "Select:",
+        vec![
+            MenuOptions::GoBack,
+            MenuOptions::Exit,
+            MenuOptions::SelectId,
+        ],
+    )
+    .prompt();
+    and.unwrap()
+}
+
+pub fn ask_id(len: usize, request: &str) -> usize {
+    let selection = CustomType::<usize>::new(request)
+        .with_validator(move |input: &usize| {
+            if (0..=len).contains(input) {
                 Ok(Validation::Valid)
             } else {
                 Ok(Validation::Invalid("Input outside of index range.".into()))
