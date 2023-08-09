@@ -124,7 +124,11 @@ impl DiscogsScraper {
                         .header(AUTHORIZATION, &token)
                         .header(USER_AGENT, WEB_USER_AGENT);
                     async move {
-                        let body = req.send().await.unwrap().text().await.unwrap();
+                        let res = req.send().await.unwrap();
+                        if res.headers()["X-Discogs-Ratelimit-Remaining"] == "10" {
+                            println!("WARNING: less than 10 API calls available!");
+                        }
+                        let body = res.text().await.unwrap();
                         let amount: Amount =
                             serde_json::from_str(&body).expect("Error parsing json");
                         (*seller, amount.amount)
