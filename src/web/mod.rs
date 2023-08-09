@@ -264,9 +264,7 @@ impl DiscogsScraper {
             }
             let subtotal =
                 node.get_inner_text("div.order_summary tr.order_subtotal td.order_summary_value");
-            let subtotal_price = subtotal.split(" ").next().unwrap()[3..]
-                .parse::<f32>()
-                .unwrap();
+            let subtotal_price: f32 = subtotal.split(" ").next().unwrap()[3..].parse().unwrap();
             table.push(vec![String::from("Subtotal"), subtotal]);
             let selector =
                 scraper::Selector::parse("div.order_summary select.shipping_method option")
