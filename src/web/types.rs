@@ -1,7 +1,6 @@
 use itertools::Itertools;
 use reqwest::blocking::{Client as ReqwestClient, RequestBuilder};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
-use serde_json;
 
 #[derive(Serialize, Deserialize)]
 pub struct Cookie {
@@ -161,17 +160,17 @@ impl Client {
 }
 
 pub trait Send {
-    fn send_request(&self) -> String;
-    fn send_request_json<T: DeserializeOwned>(&self) -> T;
+    fn send_request(self) -> String;
+    fn send_request_json<T: DeserializeOwned>(self) -> T;
 }
 
 impl Send for RequestBuilder {
-    fn send_request(&self) -> String {
+    fn send_request(self) -> String {
         let res = self.send().expect("Failed to process request.");
         res.text().unwrap()
     }
 
-    fn send_request_json<T: DeserializeOwned>(&self) -> T {
+    fn send_request_json<T: DeserializeOwned>(self) -> T {
         let res = self.send().expect("Failed to process request.");
         res.json().unwrap()
     }

@@ -1,5 +1,7 @@
 mod types;
 
+use std::collections::HashMap;
+
 use futures::{stream, StreamExt};
 use itertools::Itertools;
 use reqwest::blocking::{multipart, Client as ReqwestClient};
@@ -18,7 +20,7 @@ const VERSION: usize = 1;
 const OPERATION_NAME: &'static str = "AddReleasesToWantlist";
 const SHA256HASH: &'static str = "d07fa55f88404b5d0e5253faf962ed104ad1efd3af871c9281b76e874d4a2bf4";
 const GETLP: &'static str = "/as_json?filter=1&is_mobile=0&return_field=id&format=LP";
-const ADDLPWANTLIST: &'static str
+const ADDLPWANTLIST: &'static str = "service/catalog/api/graphql";
 
 fn create_cookie_header(path: &str) -> String {
     let data = std::fs::read_to_string(path).expect("Unable to read file");
@@ -106,13 +108,13 @@ impl DiscogsScraper {
             .enable_all()
             .build()
             .unwrap();
-        let sellers_names = sellers_page
+        let sellers = sellers_page
             .root_element()
             .get_inner_text("td.seller_info div.seller_block a");
-        let sellers: Vec<&str> = sellers_names.split(" ").collect();
+        let sellers_names: Vec<&str> = sellers.split(" ").collect();
         let asynch_client = reqwest::Client::new();
-        let amounts: Vec<usize> = rt.block_on(
-            stream::iter(&sellers)
+        let amounts: HashMap<&str, usize> = rt.block_on(
+            stream::iter(&sellers_names)
                 .take(CONCURRENT_MAX_REQUESTS)
                 .map(|seller| {
                     let url = format!("{}/marketplace/mywants/{}/amount", API_HOME_URL, seller);
@@ -125,7 +127,7 @@ impl DiscogsScraper {
                         let body = req.send().await.unwrap().text().await.unwrap();
                         let amount: Amount =
                             serde_json::from_str(&body).expect("Error parsing json");
-                        amount.amount
+                        (*seller, amount.amount)
                     }
                 })
                 .buffer_unordered(CONCURRENT_MAX_REQUESTS)
@@ -146,11 +148,10 @@ impl DiscogsScraper {
                 .enumerate()
                 .filter_map(|(i, c)| if i != 1 { Some(c) } else { None })
                 .join("");
-            let seller = sellers[i].to_string();
-            let amount = if i < CONCURRENT_MAX_REQUESTS {
-                amounts[i].to_string()
-            } else {
-                "".to_string()
+            let seller = sellers_names[i].to_string();
+            let amount = match amounts.get(sellers_names[i]) {
+                Some(amount) => amount.to_string(),
+                None => "".to_string(),
             };
             table.push(vec![seller, amount, shipping_from, condition, price]);
         }
@@ -219,7 +220,10 @@ impl DiscogsScraper {
             extensions,
             variables,
         };
-        let res = self.web.post(ADDLPWANTLIST).body(serde_json::to_string(&add_wantlist).unwrap());
+        let res = self
+            .web
+            .post(ADDLPWANTLIST)
+            .body(serde_json::to_string(&add_wantlist).unwrap());
         let body = res.send_request();
         match serde_json::from_str::<ErrorMessage>(&body) {
             Ok(e) => println!("{:#?}", e.get_messages()),
