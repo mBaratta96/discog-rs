@@ -1,23 +1,43 @@
-use clap::Parser;
+use clap::{Parser, Subcommand};
 use inquire::{validator::Validation, CustomType};
 use owo_colors::OwoColorize;
 use tabled::builder::Builder;
-use tabled::settings::Format;
 use tabled::settings::{
-    object::Columns, peaker::PriorityMax, style::BorderColor, Color, Modify, Style, Width,
+    object::{Columns, Rows},
+    peaker::PriorityMax,
+    style::BorderColor,
+    Alignment, Color, Format, Modify, Panel, Style, Width,
 };
 use terminal_size::{terminal_size, Width as TermWidth};
+
+#[derive(Debug, Subcommand)]
+pub enum Commands {
+    Add { release: String },
+    Cart,
+    Wantlist,
+}
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
 pub struct Args {
     pub cookies: String,
 
-    #[arg(short, long, default_value_t = String::from(""))]
-    pub wantlist: String,
+    #[command(subcommand)]
+    pub command: Commands,
 }
 
-pub fn print_table(header: Vec<&str>, table: &Vec<Vec<String>>) {
+#[derive(Debug)]
+pub enum TableType {
+    Default,
+    Cart,
+}
+
+pub fn print_table(
+    header: Vec<&str>,
+    table: &Vec<Vec<String>>,
+    title: &str,
+    table_type: TableType,
+) {
     let mut builder = Builder::default();
 
     builder.set_header(header);
@@ -26,16 +46,24 @@ pub fn print_table(header: Vec<&str>, table: &Vec<Vec<String>>) {
     }
 
     let builder = builder.index();
-    let mut table = builder.build();
+    let mut formatted_table = builder.build();
     let (TermWidth(term_width), _) = terminal_size().expect("Failed to get terminal size.");
 
-    table
+    formatted_table
+        .with(Panel::header(title))
+        .with(Modify::new(Rows::first()).with(Alignment::center()))
         .with(Style::rounded().horizontal('-'))
         .with(BorderColor::filled(Color::FG_BLUE))
-        .with(Modify::new(Columns::single(0)).with(Format::content(|s| s.red().to_string())))
         .with(Width::wrap(term_width as usize).priority::<PriorityMax>());
 
-    println!("{}", table);
+    match table_type {
+        TableType::Default => formatted_table
+            .with(Modify::new(Columns::first()).with(Format::content(|s| s.red().to_string()))),
+        TableType::Cart => formatted_table
+            .with(Modify::new(Rows::last()).with(Format::content(|s| s.red().to_string()))),
+    };
+
+    println!("{}", formatted_table);
 }
 
 pub fn ask_id(len: i32, request: &str) -> i32 {

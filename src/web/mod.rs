@@ -21,6 +21,7 @@ const OPERATION_NAME: &'static str = "AddReleasesToWantlist";
 const SHA256HASH: &'static str = "d07fa55f88404b5d0e5253faf962ed104ad1efd3af871c9281b76e874d4a2bf4";
 const GETLP: &'static str = "/as_json?filter=1&is_mobile=0&return_field=id&format=LP";
 const ADDLPWANTLIST: &'static str = "service/catalog/api/graphql";
+const CART: &'static str = "sell/cart";
 
 fn create_cookie_header(path: &str) -> String {
     let data = std::fs::read_to_string(path).expect("Unable to read file");
@@ -236,5 +237,10 @@ impl DiscogsScraper {
                 println!("Added {} items to wantlist.", items_added.len());
             }
         }
+    }
+
+    pub fn get_cart(&self) {
+        let res = self.web.get(CART);
+        let cart_page = scraper::Html::parse_document(&res.send_request());
     }
 }
