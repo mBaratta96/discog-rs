@@ -14,7 +14,7 @@ use terminal_size::{terminal_size, Width as TermWidth};
 pub enum Commands {
     Add { release: String },
     Cart,
-    Wantlist,
+    Wantlist { query: Option<String> },
 }
 
 #[derive(Parser, Debug)]

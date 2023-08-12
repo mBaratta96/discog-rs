@@ -57,27 +57,32 @@ impl DiscogsScraper {
         };
         scraper
     }
-    pub fn get_random_release(&self) -> (Vec<String>, Vec<Vec<String>>) {
-        let form = multipart::Form::new().text("Action.RandomItem", "Random+Item");
-        let res = self.web.post("mywantlist").multipart(form);
-        let document = scraper::Html::parse_document(&res.send_request());
-        let content = &document.root_element().get_inner_text("p a");
-        let random_release_id = content
-            .split("/")
-            .last()
-            .unwrap()
-            .split("-")
-            .next()
-            .unwrap();
-        let url = format!("releases/{}", random_release_id);
-        let res = self.api.get(&url);
-        let release: Release = res.send_request_json();
-        let artists = release.get_artists();
-        println!("Found: {} - {}", release.title, artists);
-        let res = self.web.get(&format!(
-            "mywantlist?limit=250&search={} {}",
-            release.title, artists
-        ));
+    pub fn get_random_release(&self, query: Option<String>) -> (Vec<String>, Vec<Vec<String>>) {
+        let search = match query {
+            Some(search) => search,
+            None => {
+                let form = multipart::Form::new().text("Action.RandomItem", "Random+Item");
+                let res = self.web.post("mywantlist").multipart(form);
+                let document = scraper::Html::parse_document(&res.send_request());
+                let content = &document.root_element().get_inner_text("p a");
+                let random_release_id = content
+                    .split("/")
+                    .last()
+                    .unwrap()
+                    .split("-")
+                    .next()
+                    .unwrap();
+                let url = format!("releases/{}", random_release_id);
+                let res = self.api.get(&url);
+                let release: Release = res.send_request_json();
+                let artists = release.get_artists();
+                println!("Found: {} - {}", release.title, artists);
+                format!("{} {}", release.title, artists)
+            }
+        };
+        let res = self
+            .web
+            .get(&format!("mywantlist?limit=250&search={}", search));
         let search_page = scraper::Html::parse_document(&res.send_request());
         let selector = scraper::Selector::parse("tr.shortcut_navigable").unwrap();
         let releases = search_page.select(&selector);

@@ -12,9 +12,13 @@ const ITEMS_HEADER: &[&str] = &["Realease", "Condition", "Price"];
 const RELEASE_HEADER: &[&str] = &["Release", "Status", "Info", "Details"];
 const CART_HEADER: &[&str] = &["Description", "Price"];
 
-fn check_wantlist(scraper: web::DiscogsScraper) {
-    let (links, table) = scraper.get_random_release();
+fn check_wantlist(scraper: web::DiscogsScraper, query: Option<String>) {
+    let (links, table) = scraper.get_random_release(query);
     let mut print_table = true;
+    if links.len() == 0 {
+        println!("No items in your wantlist");
+        std::process::exit(0);
+    }
     loop {
         if print_table {
             cli::print_table(WANTIST_HEADER, &table, "Releases", TableType::Default);
@@ -91,7 +95,7 @@ fn main() {
     let cookies_path = args.cookies;
     let scraper = web::DiscogsScraper::new(&cookies_path);
     match args.command {
-        Wantlist => check_wantlist(scraper),
+        Wantlist { query } => check_wantlist(scraper, query),
         Add { release } => add_to_wantlist(scraper, &release),
         Cart => get_cart(scraper),
     }
