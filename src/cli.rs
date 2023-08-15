@@ -2,12 +2,7 @@ use clap::{Parser, Subcommand};
 use inquire::{validator::Validation, CustomType, Select};
 use owo_colors::OwoColorize;
 use tabled::builder::Builder;
-use tabled::settings::{
-    object::{Columns, Rows},
-    peaker::PriorityMax,
-    style::BorderColor,
-    Alignment, Color, Format, Modify, Panel, Style, Width,
-};
+use tabled::settings::*;
 use terminal_size::{terminal_size, Width as TermWidth};
 
 #[derive(Debug, Subcommand)]
@@ -70,21 +65,23 @@ pub fn print_table(
 
     formatted_table
         .with(Panel::header(title))
-        .with(Modify::new(Rows::first()).with(Alignment::center()))
+        .with(Modify::new(object::Rows::first()).with(Alignment::center()))
         .with(Style::rounded().horizontal('-'))
-        .with(BorderColor::filled(Color::FG_BLUE))
-        .with(Width::wrap(term_width as usize).priority::<PriorityMax>());
+        .with(style::BorderColor::filled(Color::FG_BLUE))
+        .with(Width::wrap(term_width as usize).priority::<peaker::PriorityMax>());
 
     match table_type {
-        TableType::Default => formatted_table
-            .with(Modify::new(Columns::first()).with(Format::content(|s| s.red().to_string()))),
+        TableType::Default => formatted_table.with(
+            Modify::new(object::Columns::first()).with(Format::content(|s| s.red().to_string())),
+        ),
         TableType::Cart => {
-            formatted_table
-                .with(Modify::new(Rows::first()).with(Format::content(|s| s.red().to_string())));
+            formatted_table.with(
+                Modify::new(object::Rows::first()).with(Format::content(|s| s.red().to_string())),
+            );
             // +2 Because of title and header
             let subtotal_index = table.iter().position(|row| row[0] == "Subtotal").unwrap() + 2;
             formatted_table.with(
-                Modify::new(Rows::new(subtotal_index..))
+                Modify::new(object::Rows::new(subtotal_index..))
                     .with(Format::content(|s| s.red().to_string())),
             )
         }
