@@ -13,7 +13,7 @@ const RELEASE_HEADER: &[&str] = &["Release", "Status", "Info", "Details"];
 const CART_HEADER: &[&str] = &["Description", "Price"];
 
 fn check_wantlist(scraper: web::DiscogsScraper, query: Option<String>) {
-    let (links, table) = scraper.get_random_release(query);
+    let (links, table) = scraper.get_release(query);
     let mut print_table = true;
     if links.len() == 0 {
         println!("No items in your wantlist");
