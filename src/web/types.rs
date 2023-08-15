@@ -136,6 +136,11 @@ pub struct AddedItems {
     added_at: String,
 }
 
+#[derive(Serialize, Deserialize)]
+pub struct RemovedItems {
+    pub success: bool,
+}
+
 #[derive(Debug)]
 pub struct Client {
     client: ReqwestClient,

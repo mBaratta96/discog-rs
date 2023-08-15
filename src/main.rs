@@ -12,6 +12,12 @@ const ITEMS_HEADER: &[&str] = &["Realease", "Condition", "Price"];
 const RELEASE_HEADER: &[&str] = &["Release", "Status", "Info", "Details"];
 const CART_HEADER: &[&str] = &["Description", "Price"];
 
+#[derive(Debug)]
+enum WantlistOperations {
+    Add,
+    Remove,
+}
+
 fn check_wantlist(scraper: web::DiscogsScraper, query: Option<String>) {
     let (links, table) = scraper.get_release(query);
     let mut print_table = true;
@@ -66,7 +72,11 @@ fn check_wantlist(scraper: web::DiscogsScraper, query: Option<String>) {
     }
 }
 
-fn add_to_wantlist(scraper: web::DiscogsScraper, search: &str) {
+fn master_release_to_wantlist(
+    scraper: web::DiscogsScraper,
+    search: &str,
+    operation: WantlistOperations,
+) {
     let (links, table) = scraper.search_release(&search);
     cli::print_table(
         RELEASE_HEADER,
@@ -80,7 +90,10 @@ fn add_to_wantlist(scraper: web::DiscogsScraper, search: &str) {
         _ => std::process::exit(0),
     };
     let link = &links[selected_index];
-    scraper.add_lps_to_wantlist(link);
+    match operation {
+        WantlistOperations::Add => scraper.add_lps_to_wantlist(&link),
+        WantlistOperations::Remove => scraper.remove_all_wantlist(&link),
+    }
 }
 
 fn get_cart(scraper: web::DiscogsScraper) {
@@ -96,7 +109,10 @@ fn main() {
     let scraper = web::DiscogsScraper::new(&cookies_path);
     match args.command {
         Wantlist { query } => check_wantlist(scraper, query),
-        Add { release } => add_to_wantlist(scraper, &release),
+        Add { release } => master_release_to_wantlist(scraper, &release, WantlistOperations::Add),
+        Remove { release } => {
+            master_release_to_wantlist(scraper, &release, WantlistOperations::Remove)
+        }
         Cart => get_cart(scraper),
     }
 }
