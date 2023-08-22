@@ -6,7 +6,7 @@ use cli::Commands::*;
 use cli::{MenuOptions, TableType};
 use core::iter::zip;
 
-const WANTIST_HEADER: &[&str] = &["Sellers", "Title", "Format", "Year"];
+const WANTIST_HEADER: &[&str] = &["Seen", "Sellers", "Title", "Format", "Year"];
 const SELLERS_HEADER: &[&str] = &["Seller", "Amount", "Shipping From", "Condition", "Price"];
 const ITEMS_HEADER: &[&str] = &["Realease", "Condition", "Price"];
 const RELEASE_HEADER: &[&str] = &["Release", "Status", "Info", "Details"];
@@ -19,11 +19,14 @@ enum WantlistOperations {
 }
 
 fn check_wantlist(scraper: web::DiscogsScraper, query: Option<String>) {
-    let (links, table) = scraper.get_release(query);
+    let (links, mut table) = scraper.get_release(query);
     let mut print_table = true;
     if links.len() == 0 {
         println!("No items in your wantlist");
         std::process::exit(0);
+    }
+    for row in table.iter_mut() {
+        row.insert(0, String::from(" "));
     }
     loop {
         if print_table {
@@ -41,6 +44,7 @@ fn check_wantlist(scraper: web::DiscogsScraper, query: Option<String>) {
             continue;
         }
         print_table = true;
+        table[selected_index][0] = String::from("X");
         let selected = &links[selected_index];
         let table = scraper.get_sellers(selected);
         loop {
