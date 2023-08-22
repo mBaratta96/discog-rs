@@ -28,7 +28,7 @@ impl DiscogsScraper {
                 let res = self.api.get(&url);
                 let release: Release = res.send_request_json();
                 let artists = release.get_artists();
-                println!("Found: {} - {}", release.title, artists);
+                println!("Found: {} - {}", artists, release.title);
                 format!("{} {}", release.title, artists)
             }
         };
